@@ -47,34 +47,50 @@ const API = {
 // ============================================
 
 async function signUp(email, password, username) {
-  const res = await fetch(`${API.url}/auth/v1/signup`, {
-    method: 'POST',
-    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, data: { username } }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.msg || '注册失败');
-  return data;
+  try {
+    const res = await fetch(`${API.url}/auth/v1/signup`, {
+      method: 'POST',
+      headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, data: { username } }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      // 检查是否是已注册用户
+      if (res.status === 422 || res.status === 400) {
+        return { data: null, error: new Error(data?.msg || '该邮箱可能已注册，请尝试登录') };
+      }
+      return { data: null, error: new Error(data?.msg || '注册失败') };
+    }
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e };
+  }
 }
 
 async function signIn(email, password) {
-  const res = await fetch(`${API.url}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error_description || data?.msg || '登录失败');
-  // 保存 session 到 localStorage
-  if (data.access_token) {
-    localStorage.setItem('sb-token', JSON.stringify({
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
-      expires_at: Date.now() + data.expires_in * 1000,
-      user: data.user,
-    }));
+  try {
+    const res = await fetch(`${API.url}/auth/v1/token?grant_type=password`, {
+      method: 'POST',
+      headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      return { data: null, error: new Error(data?.error_description || data?.msg || '邮箱或密码错误') };
+    }
+    // 保存 session 到 localStorage
+    if (data.access_token) {
+      localStorage.setItem('sb-token', JSON.stringify({
+        access_token: data.access_token,
+        refresh_token: data.refresh_token,
+        expires_at: Date.now() + (data.expires_in || 3600) * 1000,
+        user: data.user,
+      }));
+    }
+    return { data, error: null };
+  } catch (e) {
+    return { data: null, error: e };
   }
-  return data;
 }
 
 async function signOut() {
@@ -89,28 +105,40 @@ async function signOut() {
 }
 
 async function resetPassword(email) {
-  const res = await fetch(`${API.url}/auth/v1/recover`, {
-    method: 'POST',
-    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email }),
-  });
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data?.msg || '发送失败');
+  try {
+    const res = await fetch(`${API.url}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      return { error: new Error(data?.msg || '发送失败，请检查邮箱是否正确') };
+    }
+    return { error: null };
+  } catch (e) {
+    return { error: e };
   }
 }
 
 async function updatePassword(newPassword) {
-  const res = await fetch(`${API.url}/auth/v1/user`, {
-    method: 'PUT',
-    headers: {
-      'apikey': API.key,
-      'Authorization': `Bearer ${getAccessToken()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ password: newPassword }),
-  });
-  if (!res.ok) throw new Error('更新密码失败');
+  try {
+    const token = getAccessToken();
+    if (!token) return { error: new Error('登录已过期，请重新登录') };
+    const res = await fetch(`${API.url}/auth/v1/user`, {
+      method: 'PUT',
+      headers: {
+        'apikey': API.key,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ password: newPassword }),
+    });
+    if (!res.ok) return { error: new Error('更新密码失败，链接可能已过期') };
+    return { error: null };
+  } catch (e) {
+    return { error: e };
+  }
 }
 
 function getLocalSession() {

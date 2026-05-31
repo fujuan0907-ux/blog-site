@@ -62,16 +62,17 @@
 
       const { data, error } = await signIn(email, password);
 
+      // 无论如何先恢复按钮状态
+      document.getElementById('btn-text').classList.remove('hidden');
+      document.getElementById('btn-spinner').classList.add('hidden');
+      document.getElementById('btn-submit').disabled = false;
+
       if (error) {
         showAlert('alert-error', error.message || '登录失败，请检查邮箱和密码');
       } else {
         showAlert('alert-success', '登录成功！正在跳转...');
         setTimeout(() => { window.location.href = 'index.html'; }, 800);
       }
-
-      document.getElementById('btn-text').classList.remove('hidden');
-      document.getElementById('btn-spinner').classList.add('hidden');
-      document.getElementById('btn-submit').disabled = false;
     });
 
     // 如果已经登录，直接跳转

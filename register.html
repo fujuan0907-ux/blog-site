@@ -80,18 +80,25 @@
 
       const { data, error } = await signUp(email, password, username);
 
-      if (error) {
-        showAlert('alert-error', error.message || '注册失败，请重试');
-      } else if (data?.user?.identities?.length === 0) {
-        showAlert('alert-error', '该邮箱已被注册，请直接登录');
-      } else {
-        showAlert('alert-success', '注册成功！请查看邮箱确认链接（如已开启邮箱验证），然后登录。');
-        setTimeout(() => { window.location.href = 'login.html'; }, 2000);
-      }
-
+      // 无论如何先恢复按钮状态
       document.getElementById('btn-text').classList.remove('hidden');
       document.getElementById('btn-spinner').classList.add('hidden');
       document.getElementById('btn-submit').disabled = false;
+
+      if (error) {
+        showAlert('alert-error', error.message || '注册失败，请重试');
+      } else if (data && data.id) {
+        showAlert('alert-success', '✅ 注册成功！正在跳转到登录页...');
+        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+      } else if (data?.user) {
+        // supabase-js 格式兼容
+        showAlert('alert-success', '✅ 注册成功！请查看邮箱确认链接，然后登录。');
+        setTimeout(() => { window.location.href = 'login.html'; }, 2000);
+      } else {
+        showAlert('alert-success', '✅ 注册请求已提交！如果开启邮箱验证，请查看邮箱。');
+        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+      }
+
     });
   </script>
 </body>
