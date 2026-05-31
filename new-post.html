@@ -150,10 +150,15 @@
     function addImages(files) {
       if (!files || files.length === 0) return;
 
+      var ALLOWED_EXT = ['jpg','jpeg','png','gif','webp','svg','heic','heif','bmp','tiff','tif'];
+
       var added = 0;
       Array.from(files).forEach(function(file) {
-        if (!file.type.startsWith('image/')) {
-          showMsg('alert-error', '❌ "' + file.name + '" 不是图片文件');
+        var ext = (file.name.split('.').pop() || '').toLowerCase();
+        var isImage = file.type.startsWith('image/') || ALLOWED_EXT.indexOf(ext) !== -1;
+
+        if (!isImage) {
+          showMsg('alert-error', '❌ "' + file.name + '" 不是图片文件（类型: ' + (file.type || '未知') + '）');
           return;
         }
         if (file.size > 5 * 1024 * 1024) {
@@ -283,8 +288,8 @@
           }
 
           var ext = img.file.name.split('.').pop().toLowerCase();
-          if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) === -1) {
-            showMsg('alert-error', '❌ 图片 "' + img.file.name + '" 格式不支持，请上传 JPG/PNG/GIF/WebP 格式');
+          if (['jpg','jpeg','png','gif','webp','svg','heic','heif','bmp','tiff','tif'].indexOf(ext) === -1) {
+            showMsg('alert-error', '❌ 图片 "' + img.file.name + '" 格式不支持，请上传 JPG/PNG/GIF/WebP/HEIC 格式');
             reenable(); return;
           }
 
