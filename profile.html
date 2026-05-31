@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>个人信息 - My Blog</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">📝 My Blog</a>
+    <ul class="navbar-nav" id="nav-auth">
+      <li><a href="login.html" class="btn btn-outline btn-sm">登录</a></li>
+    </ul>
+  </nav>
+
+  <main class="container">
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title">👤 个人信息</h1>
+      </div>
+
+      <div id="alert-success" class="alert alert-success" style="display:none;"></div>
+
+      <div id="profile-content">
+        <div class="loading"><div class="spinner"></div> 加载中...</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    var SUPABASE_URL = 'https://kieznunxgzsaxxokvspx.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZXpudW54Z3pzYXh4b2t2c3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjI2NDIsImV4cCI6MjA5NTc5ODY0Mn0.9peQ-Xc6FgNYTrz9IxM9322uWfG_6tCsxd-AyP4JSkU';
+
+    function getSession() { try { return JSON.parse(localStorage.getItem('sb-token')); } catch(e) { return null; } }
+    function getToken() { var s = getSession(); return s?.access_token || null; }
+    function getUser() { var s = getSession(); return s?.user || null; }
+
+    function showMsg(id, msg) {
+      var el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 4000);
+    }
+
+    // 导航栏
+    (function() {
+      var user = getUser();
+      var nav = document.getElementById('nav-auth');
+      if (!user) { window.location.href = 'login.html'; return; }
+      nav.innerHTML =
+        '<a href="new-post.html" class="btn btn-primary btn-sm">✏️ 写文章</a>' +
+        '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + user.email + '</a>' +
+        '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
+      document.getElementById('btn-logout').addEventListener('click', function(e) {
+        e.preventDefault(); localStorage.removeItem('sb-token'); window.location.href = 'index.html';
+      });
+    })();
+
+    async function loadProfile() {
+      try {
+        var token = getToken();
+        if (!token) { window.location.href = 'login.html'; return; }
+
+        // 获取用户信息
+        var userRes = await fetch(SUPABASE_URL + '/auth/v1/user', {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token }
+        });
+        var userData = await userRes.json();
+
+        // 获取文章数量
+        var user = getUser();
+        var postsRes = await fetch(SUPABASE_URL + '/rest/v1/posts?select=id&user_id=eq.' + user.id, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        var posts = await postsRes.json();
+        var postCount = Array.isArray(posts) ? posts.length : 0;
+
+        var created = userData.created_at || userData.confirmed_at || '';
+        var regDate = created ? new Date(created).toLocaleDateString('zh-CN', {
+          year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+        }) : '未知';
+
+        document.getElementById('profile-content').innerHTML =
+          '<div style="display:flex; flex-direction:column; gap:1.25rem;">' +
+            '<div style="display:flex; align-items:center; gap:1rem; padding-bottom:1.25rem; border-bottom:1px solid var(--gray-100);">' +
+              '<div style="width:64px;height:64px;border-radius:50%;background:var(--primary-light);display:flex;align-items:center;justify-content:center;font-size:1.5rem;">👤</div>' +
+              '<div>' +
+                '<div style="font-weight:700;font-size:1.1rem;">' + (userData.email || '') + '</div>' +
+                '<div style="font-size:0.85rem;color:var(--gray-400);">已发布 ' + postCount + ' 篇文章</div>' +
+              '</div>' +
+            '</div>' +
+
+            '<div><span style="color:var(--gray-400);font-size:0.85rem;">📧 邮箱</span><br>' +
+              '<span style="font-weight:500;">' + (userData.email || '-') + '</span></div>' +
+
+            '<div><span style="color:var(--gray-400);font-size:0.85rem;">📅 注册日期</span><br>' +
+              '<span style="font-weight:500;">' + regDate + '</span></div>' +
+
+            '<div style="padding-top:0.75rem; border-top:1px solid var(--gray-100); display:flex; gap:0.75rem;">' +
+              '<a href="change-password.html" class="btn btn-outline">🔑 修改密码</a>' +
+              '<a href="index.html" class="btn btn-outline">← 返回首页</a>' +
+            '</div>' +
+          '</div>';
+
+      } catch(e) {
+        document.getElementById('profile-content').innerHTML =
+          '<div class="empty-state"><div class="icon">⚠️</div><h3>加载失败</h3><p>' + e.message + '</p></div>';
+      }
+    }
+
+    loadProfile();
+  </script>
+</body>
+</html>

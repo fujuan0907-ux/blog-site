@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>发布文章 - My Blog</title>
+  <title>写文章 - My Blog</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/config.js"></script>
 </head>
 <body>
 
@@ -20,8 +19,8 @@
         <h1 class="card-title" id="page-title">✏️ 发布新文章</h1>
       </div>
 
-      <div id="alert-error" class="alert alert-error"></div>
-      <div id="alert-success" class="alert alert-success"></div>
+      <div id="alert-error" class="alert alert-error" style="display:none;"></div>
+      <div id="alert-success" class="alert alert-success" style="display:none;"></div>
 
       <form id="post-form">
         <div class="form-group">
@@ -31,32 +30,29 @@
 
         <div class="form-group">
           <label class="form-label" for="post-content">文章内容</label>
-          <textarea class="form-textarea" id="post-content" placeholder="在这里写下你的想法...&#10;&#10;支持 Markdown 风格排版" required></textarea>
+          <textarea class="form-textarea" id="post-content" placeholder="在这里写下你的想法..." required></textarea>
         </div>
 
-        <!-- 图片上传区 -->
+        <!-- 图片上传 -->
         <div class="form-group">
           <label class="form-label">📷 上传图片</label>
-          <div class="media-upload-area" id="image-upload-area">
+          <div class="media-upload-area" id="image-drop">
             <div class="icon">🖼️</div>
-            <p>点击上传图片（支持 JPG/PNG/GIF/WebP）</p>
-            <p class="form-hint">每张图片最大 5MB</p>
+            <p>点击或拖拽上传图片（JPG/PNG/GIF/WebP，最大 5MB）</p>
           </div>
           <input type="file" id="image-input" accept="image/*" multiple style="display:none;">
           <div class="media-preview" id="image-previews"></div>
         </div>
 
-        <!-- 视频链接区 -->
+        <!-- 视频链接 -->
         <div class="form-group">
           <label class="form-label">🎬 添加视频</label>
-          <p class="form-hint">支持 YouTube / Bilibili 链接，或直接输入视频 URL</p>
-          <div id="video-urls">
-            <!-- 动态添加 -->
-          </div>
+          <p class="form-hint">支持 YouTube / Bilibili 链接</p>
+          <div id="video-list"></div>
           <button type="button" class="btn btn-outline btn-sm mt-1" id="btn-add-video">+ 添加视频链接</button>
         </div>
 
-        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+        <div style="display:flex; gap:0.75rem; margin-top:1.5rem;">
           <button type="submit" class="btn btn-primary" id="btn-submit">
             <span id="btn-text">发布文章</span>
             <span class="spinner hidden" id="btn-spinner"></span>
@@ -67,205 +63,194 @@
     </div>
   </main>
 
-  <script src="js/app.js"></script>
   <script>
-    // ============ 权限检查 ============
-    (async () => {
-      const { user } = await getCurrentUser();
-      if (!user) {
-        window.location.href = 'login.html';
-        return;
-      }
-      updateNavbar();
+    var SUPABASE_URL = 'https://kieznunxgzsaxxokvspx.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZXpudW54Z3pzYXh4b2t2c3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjI2NDIsImV4cCI6MjA5NTc5ODY0Mn0.9peQ-Xc6FgNYTrz9IxM9322uWfG_6tCsxd-AyP4JSkU';
 
-      // 检查是否是编辑模式
-      const urlParams = new URLSearchParams(window.location.search);
-      const editId = urlParams.get('edit');
-      if (editId) await loadPostForEditing(editId);
+    function getSession() { try { return JSON.parse(localStorage.getItem('sb-token')); } catch(e) { return null; } }
+    function getToken() { var s = getSession(); return s?.access_token || null; }
+    function getUser() { var s = getSession(); return s?.user || null; }
+
+    function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+    function showMsg(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 5000); }
+
+    // ====== 权限检查 ======
+    var user = getUser();
+    if (!user) { window.location.href = 'login.html'; }
+
+    // 导航栏
+    (function() {
+      var nav = document.getElementById('nav-auth');
+      nav.innerHTML =
+        '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
+        '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
+      document.getElementById('btn-logout').addEventListener('click', function(e) {
+        e.preventDefault(); localStorage.removeItem('sb-token'); window.location.href = 'index.html';
+      });
     })();
 
-    // ============ 图片上传 ============
-    const imageUploadArea = document.getElementById('image-upload-area');
-    const imageInput = document.getElementById('image-input');
-    const imagePreviews = document.getElementById('image-previews');
-    const uploadedImages = []; // { file, previewUrl, caption }
-
-    imageUploadArea.addEventListener('click', () => imageInput.click());
-    imageUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); imageUploadArea.style.borderColor = 'var(--primary)'; });
-    imageUploadArea.addEventListener('dragleave', () => { imageUploadArea.style.borderColor = 'var(--gray-300)'; });
-    imageUploadArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      imageUploadArea.style.borderColor = 'var(--gray-300)';
-      handleImageFiles(e.dataTransfer.files);
-    });
-    imageInput.addEventListener('change', (e) => handleImageFiles(e.target.files));
-
-    function handleImageFiles(files) {
-      Array.from(files).forEach(file => {
-        if (!file.type.startsWith('image/')) {
-          showAlert('alert-error', `${file.name} 不是图片文件`);
-          return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-          showAlert('alert-error', `${file.name} 超过 5MB 限制`);
-          return;
-        }
-        const previewUrl = URL.createObjectURL(file);
-        uploadedImages.push({ file, previewUrl, caption: '' });
-        renderImagePreviews();
-      });
+    // ====== 编辑模式 ======
+    var editingId = new URLSearchParams(window.location.search).get('edit') || null;
+    if (editingId) {
+      document.getElementById('page-title').textContent = '✏️ 编辑文章';
+      document.getElementById('btn-text').textContent = '保存修改';
+      loadExistingPost(editingId);
     }
 
-    function removeImage(index) {
-      URL.revokeObjectURL(uploadedImages[index].previewUrl);
-      uploadedImages.splice(index, 1);
+    async function loadExistingPost(id) {
+      try {
+        var res = await fetch(SUPABASE_URL + '/rest/v1/posts?id=eq.' + id + '&select=*', {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        var posts = await res.json();
+        var post = posts && posts[0];
+        if (post) {
+          document.getElementById('post-title').value = post.title || '';
+          document.getElementById('post-content').value = post.content || '';
+          if (post.media_urls) {
+            post.media_urls.forEach(function(m) {
+              if (m.type === 'image') {
+                uploadedImages.push({ file: null, previewUrl: m.url, uploadedUrl: m.url, caption: m.caption || '' });
+              } else if (m.type === 'video') {
+                videoEntries.push({ url: m.url, caption: m.caption || '' });
+              }
+            });
+            renderImagePreviews();
+            renderVideoInputs();
+          }
+        }
+      } catch(e) { showMsg('alert-error', '加载文章失败'); }
+    }
+
+    // ====== 图片上传 ======
+    var uploadedImages = [];
+    document.getElementById('image-drop').addEventListener('click', function() { document.getElementById('image-input').click(); });
+    document.getElementById('image-drop').addEventListener('dragover', function(e) { e.preventDefault(); });
+    document.getElementById('image-drop').addEventListener('drop', function(e) {
+      e.preventDefault(); handleFiles(e.dataTransfer.files);
+    });
+    document.getElementById('image-input').addEventListener('change', function(e) { handleFiles(e.target.files); });
+
+    function handleFiles(files) {
+      Array.from(files).forEach(function(file) {
+        if (!file.type.startsWith('image/')) { showMsg('alert-error', file.name + ' 不是图片'); return; }
+        if (file.size > 5*1024*1024) { showMsg('alert-error', file.name + ' 超过 5MB'); return; }
+        uploadedImages.push({ file: file, previewUrl: URL.createObjectURL(file), caption: '' });
+      });
       renderImagePreviews();
     }
 
     function renderImagePreviews() {
-      imagePreviews.innerHTML = uploadedImages.map((img, i) => `
-        <div class="media-preview-item">
-          <img src="${img.previewUrl}" alt="预览">
-          <button class="media-preview-remove" onclick="removeImage(${i})" type="button">✕</button>
-        </div>
-        <input type="text" class="form-input" placeholder="图片说明（可选）"
-          style="width:120px;font-size:0.75rem;padding:0.25rem 0.5rem;"
-          value="${escapeHtml(img.caption)}"
-          onchange="uploadedImages[${i}].caption = this.value">
-      `).join('');
+      document.getElementById('image-previews').innerHTML = uploadedImages.map(function(img, i) {
+        return '<div class="media-preview-item">' +
+          '<img src="' + img.previewUrl + '" alt="">' +
+          '<button class="media-preview-remove" onclick="removeImg(' + i + ')" type="button">✕</button>' +
+          '</div>' +
+          '<input class="form-input" placeholder="图片说明（可选）" style="width:120px;font-size:0.75rem;padding:0.25rem;" value="' + esc(img.caption) + '" onchange="uploadedImages[' + i + '].caption=this.value">';
+      }).join('');
     }
 
-    // ============ 视频链接 ============
-    const videoUrlsContainer = document.getElementById('video-urls');
-    const videoEntries = []; // { url, caption }
+    function removeImg(i) { URL.revokeObjectURL(uploadedImages[i].previewUrl); uploadedImages.splice(i,1); renderImagePreviews(); }
 
-    document.getElementById('btn-add-video').addEventListener('click', () => {
-      videoEntries.push({ url: '', caption: '' });
-      renderVideoInputs();
+    // ====== 视频链接 ======
+    var videoEntries = [];
+    document.getElementById('btn-add-video').addEventListener('click', function() {
+      videoEntries.push({ url: '', caption: '' }); renderVideoInputs();
     });
 
-    function removeVideo(index) {
-      videoEntries.splice(index, 1);
-      renderVideoInputs();
-    }
-
     function renderVideoInputs() {
-      videoUrlsContainer.innerHTML = videoEntries.map((v, i) => `
-        <div class="video-url-row" style="margin-bottom:0.5rem;">
-          <input type="url" class="form-input" placeholder="视频 URL（YouTube/Bilibili/直链）"
-            value="${escapeHtml(v.url)}"
-            onchange="videoEntries[${i}].url = this.value">
-          <input type="text" class="form-input" placeholder="视频说明（可选）" style="max-width:160px;"
-            value="${escapeHtml(v.caption)}"
-            onchange="videoEntries[${i}].caption = this.value">
-          <button type="button" class="btn btn-outline btn-sm" onclick="removeVideo(${i})">✕</button>
-        </div>
-      `).join('');
+      document.getElementById('video-list').innerHTML = videoEntries.map(function(v, i) {
+        return '<div class="video-url-row">' +
+          '<input class="form-input" placeholder="视频 URL" value="' + esc(v.url) + '" onchange="videoEntries[' + i + '].url=this.value">' +
+          '<input class="form-input" placeholder="说明（可选）" style="max-width:160px;" value="' + esc(v.caption) + '" onchange="videoEntries[' + i + '].caption=this.value">' +
+          '<button type="button" class="btn btn-outline btn-sm" onclick="removeVideo(' + i + ')">✕</button>' +
+          '</div>';
+      }).join('');
     }
 
-    // ============ 表单提交 ============
-    const form = document.getElementById('post-form');
-    let editingPostId = null;
+    function removeVideo(i) { videoEntries.splice(i,1); renderVideoInputs(); }
 
-    form.addEventListener('submit', async (e) => {
+    // ====== 提交 ======
+    document.getElementById('post-form').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const title = document.getElementById('post-title').value.trim();
-      const content = document.getElementById('post-content').value.trim();
-
-      if (!title) { showAlert('alert-error', '请输入文章标题'); return; }
-      if (!content) { showAlert('alert-error', '请输入文章内容'); return; }
+      var title = document.getElementById('post-title').value.trim();
+      var content = document.getElementById('post-content').value.trim();
+      if (!title) { showMsg('alert-error', '请输入标题'); return; }
+      if (!content) { showMsg('alert-error', '请输入内容'); return; }
 
       document.getElementById('btn-text').classList.add('hidden');
       document.getElementById('btn-spinner').classList.remove('hidden');
       document.getElementById('btn-submit').disabled = true;
 
       try {
-        const { user } = await getCurrentUser();
-        if (!user) { window.location.href = 'login.html'; return; }
+        var user = getUser();
+        var token = getToken();
 
-        // 上传图片
-        const imageMediaUrls = [];
-        for (const img of uploadedImages) {
+        // 上传新图片
+        var imageUrls = [];
+        for (var i = 0; i < uploadedImages.length; i++) {
+          var img = uploadedImages[i];
           if (img.uploadedUrl) {
-            // 编辑模式：已有 URL，不需重新上传
-            imageMediaUrls.push({ type: 'image', url: img.uploadedUrl, caption: img.caption });
-          } else {
-            const { url, error } = await uploadMedia(img.file, user.id);
-            if (error) {
-              showAlert('alert-error', `图片上传失败: ${error.message}`);
-              return;
-            }
-            imageMediaUrls.push({ type: 'image', url, caption: img.caption });
-          }
-        }
-
-        // 收集视频链接
-        const videoMediaUrls = videoEntries
-          .filter(v => v.url.trim())
-          .map(v => ({ type: 'video', url: v.url.trim(), caption: v.caption }));
-
-        const allMediaUrls = [...imageMediaUrls, ...videoMediaUrls];
-
-        let result;
-        if (editingPostId) {
-          result = await updatePost(editingPostId, title, content, allMediaUrls);
-        } else {
-          result = await createPost(title, content, allMediaUrls);
-        }
-
-        if (result.error) {
-          showAlert('alert-error', result.error.message || '操作失败');
-        } else {
-          window.location.href = `post.html?id=${result.data.id}`;
-        }
-      } catch (err) {
-        showAlert('alert-error', err.message || '发生错误，请重试');
-      }
-
-      document.getElementById('btn-text').classList.remove('hidden');
-      document.getElementById('btn-spinner').classList.add('hidden');
-      document.getElementById('btn-submit').disabled = false;
-    });
-
-    // ============ 编辑模式 ============
-    async function loadPostForEditing(id) {
-      const { data: post, error } = await getPostById(id);
-      if (error || !post) {
-        showAlert('alert-error', '文章不存在');
-        return;
-      }
-
-      // 检查权限
-      const { user } = await getCurrentUser();
-      if (!user || user.id !== post.user_id) {
-        window.location.href = `post.html?id=${id}`;
-        return;
-      }
-
-      editingPostId = id;
-      document.getElementById('page-title').textContent = '✏️ 编辑文章';
-      document.getElementById('btn-text').textContent = '保存修改';
-      document.getElementById('post-title').value = post.title;
-      document.getElementById('post-content').value = post.content;
-
-      // 恢复已上传的媒体
-      if (post.media_urls) {
-        post.media_urls.forEach(media => {
-          if (media.type === 'image') {
-            uploadedImages.push({
-              file: null,
-              previewUrl: media.url,
-              uploadedUrl: media.url,
-              caption: media.caption || '',
+            imageUrls.push({ type: 'image', url: img.uploadedUrl, caption: img.caption });
+          } else if (img.file) {
+            var ext = img.file.name.split('.').pop();
+            var fname = user.id + '/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.' + ext;
+            var formData = new FormData();
+            formData.append('', img.file);
+            var upRes = await fetch(SUPABASE_URL + '/storage/v1/object/post-media/' + fname, {
+              method: 'POST',
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token },
+              body: formData
             });
-          } else if (media.type === 'video') {
-            videoEntries.push({ url: media.url, caption: media.caption || '' });
+            if (!upRes.ok) { showMsg('alert-error', '图片上传失败'); return reenable(); }
+            imageUrls.push({ type: 'image', url: SUPABASE_URL + '/storage/v1/object/public/post-media/' + fname, caption: img.caption });
           }
+        }
+
+        var videoUrls = videoEntries.filter(function(v) { return v.url.trim(); }).map(function(v) {
+          return { type: 'video', url: v.url.trim(), caption: v.caption };
         });
-        renderImagePreviews();
-        renderVideoInputs();
+
+        var allMedia = imageUrls.concat(videoUrls);
+        var body = { title: title, content: content, media_urls: allMedia, updated_at: new Date().toISOString() };
+
+        var result;
+        if (editingId) {
+          var patchRes = await fetch(SUPABASE_URL + '/rest/v1/posts?id=eq.' + editingId, {
+            method: 'PATCH',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+            body: JSON.stringify(body)
+          });
+          var patchData = await patchRes.json();
+          result = patchData && patchData[0];
+        } else {
+          body.user_id = user.id;
+          var postRes = await fetch(SUPABASE_URL + '/rest/v1/posts', {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+            body: JSON.stringify(body)
+          });
+          var postData = await postRes.json();
+          result = postData && postData[0];
+        }
+
+        if (result) {
+          window.location.href = 'post.html?id=' + result.id;
+        } else {
+          showMsg('alert-error', '发布失败，请重试');
+          reenable();
+        }
+      } catch(err) {
+        showMsg('alert-error', '错误: ' + err.message);
+        reenable();
       }
-    }
+
+      function reenable() {
+        document.getElementById('btn-text').classList.remove('hidden');
+        document.getElementById('btn-spinner').classList.add('hidden');
+        document.getElementById('btn-submit').disabled = false;
+      }
+    });
   </script>
 </body>
 </html>

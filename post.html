@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>文章 - My Blog</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/config.js"></script>
 </head>
 <body>
 
@@ -20,86 +19,123 @@
     </div>
   </main>
 
-  <script src="js/app.js"></script>
   <script>
-    let currentPost = null;
-    let currentUserId = null;
+    var SUPABASE_URL = 'https://kieznunxgzsaxxokvspx.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZXpudW54Z3pzYXh4b2t2c3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjI2NDIsImV4cCI6MjA5NTc5ODY0Mn0.9peQ-Xc6FgNYTrz9IxM9322uWfG_6tCsxd-AyP4JSkU';
 
-    async function loadPost() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const postId = urlParams.get('id');
+    function getSession() { try { return JSON.parse(localStorage.getItem('sb-token')); } catch(e) { return null; } }
+    function getToken() { var s = getSession(); return s?.access_token || null; }
+    function getUser() { var s = getSession(); return s?.user || null; }
 
-      if (!postId) {
-        document.getElementById('post-container').innerHTML = `
-          <div class="empty-state">
-            <div class="icon">🔍</div>
-            <h3>文章不存在</h3>
-            <a href="index.html" class="btn btn-outline mt-2">返回首页</a>
-          </div>`;
-        return;
-      }
+    function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-      const { data: post, error } = await getPostById(postId);
-
-      if (error || !post) {
-        document.getElementById('post-container').innerHTML = `
-          <div class="empty-state">
-            <div class="icon">🔍</div>
-            <h3>文章不存在或已被删除</h3>
-            <a href="index.html" class="btn btn-outline mt-2">返回首页</a>
-          </div>`;
-        return;
-      }
-
-      currentPost = post;
-      const { user } = await getCurrentUser();
-      currentUserId = user?.id;
-
-      document.title = `${post.title} - My Blog`;
-
-      const isOwner = user && user.id === post.user_id;
-      const mediaHtml = renderMedia(post.media_urls);
-
-      document.getElementById('post-container').innerHTML = `
-        <article class="card post-detail">
-          <header class="post-detail-header">
-            <h1 class="post-detail-title">${escapeHtml(post.title)}</h1>
-            <div class="post-detail-meta">
-              <span>👤 ${escapeHtml(post.profiles?.username || '匿名')}</span>
-              <span>🕐 ${formatDate(post.created_at)}</span>
-              ${post.created_at !== post.updated_at ? `<span>✏️ 更新于 ${formatDate(post.updated_at)}</span>` : ''}
-            </div>
-            ${isOwner ? `
-              <div class="post-detail-actions">
-                <a href="new-post.html?edit=${post.id}" class="btn btn-outline btn-sm">✏️ 编辑</a>
-                <button class="btn btn-danger btn-sm" id="btn-delete">🗑️ 删除</button>
-              </div>` : ''}
-          </header>
-
-          <div class="post-detail-content">
-            ${mediaHtml ? `<div style="margin-bottom:1.5rem;">${mediaHtml}</div>` : ''}
-            ${escapeHtml(post.content)}
-          </div>
-        </article>
-
-        <div style="margin-top:1rem;">
-          <a href="index.html" class="btn btn-outline">← 返回文章列表</a>
-        </div>
-      `;
-
-      // 删除按钮
-      document.getElementById('btn-delete')?.addEventListener('click', async () => {
-        if (!confirm('确定要删除这篇文章吗？此操作不可撤销。')) return;
-        const { error } = await deletePost(post.id);
-        if (error) {
-          alert('删除失败: ' + error.message);
-        } else {
-          window.location.href = 'index.html';
-        }
-      });
+    function fmtDate(d) {
+      var date = new Date(d), n = new Date(), diff = n - date;
+      var m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), days = Math.floor(diff / 86400000);
+      if (m < 1) return '刚刚'; if (m < 60) return m + ' 分钟前';
+      if (h < 24) return h + ' 小时前'; if (days < 7) return days + ' 天前';
+      return date.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' });
     }
 
-    updateNavbar();
+    function renderMedia(mediaUrls) {
+      if (!mediaUrls || !mediaUrls.length) return '';
+      return mediaUrls.map(function(m) {
+        var html = '<div class="post-detail-media">';
+        if (m.type === 'image') {
+          html += '<img src="' + esc(m.url) + '" alt="' + esc(m.caption || '') + '" loading="lazy">';
+        } else if (m.type === 'video') {
+          var ytMatch = m.url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+          var blMatch = m.url.match(/bilibili\.com\/video\/(BV[\w]+)/);
+          if (ytMatch) html += '<iframe src="https://www.youtube.com/embed/' + ytMatch[1] + '" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>';
+          else if (blMatch) html += '<iframe src="https://player.bilibili.com/player.html?bvid=' + blMatch[1] + '" frameborder="0" allowfullscreen></iframe>';
+          else html += '<video src="' + esc(m.url) + '" controls></video>';
+        }
+        if (m.caption) html += '<p class="media-caption">' + esc(m.caption) + '</p>';
+        html += '</div>';
+        return html;
+      }).join('');
+    }
+
+    // 导航栏
+    function updateNav() {
+      var nav = document.getElementById('nav-auth');
+      var user = getUser();
+      if (user) {
+        nav.innerHTML =
+          '<a href="new-post.html" class="btn btn-primary btn-sm">✏️ 写文章</a>' +
+          '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
+          '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
+        document.getElementById('btn-logout').addEventListener('click', function(e) {
+          e.preventDefault(); localStorage.removeItem('sb-token'); window.location.href = 'index.html';
+        });
+      } else {
+        nav.innerHTML = '<a href="login.html" class="btn btn-outline btn-sm">登录</a><a href="register.html" class="btn btn-primary btn-sm">注册</a>';
+      }
+    }
+
+    var currentPost = null;
+
+    async function loadPost() {
+      var id = new URLSearchParams(window.location.search).get('id');
+      if (!id) {
+        document.getElementById('post-container').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>文章不存在</h3><a href="index.html" class="btn btn-outline mt-2">返回首页</a></div>';
+        return;
+      }
+
+      try {
+        var select = 'id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)';
+        var res = await fetch(SUPABASE_URL + '/rest/v1/posts?id=eq.' + id + '&select=' + select, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        var posts = await res.json();
+        var post = posts && posts[0];
+
+        if (!post) {
+          document.getElementById('post-container').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>文章不存在</h3><a href="index.html" class="btn btn-outline mt-2">返回首页</a></div>';
+          return;
+        }
+
+        currentPost = post;
+        var user = getUser();
+        var isOwner = user && user.id === post.user_id;
+        var mediaHtml = renderMedia(post.media_urls);
+        var updated = post.created_at !== post.updated_at ? '<span>✏️ 更新于 ' + fmtDate(post.updated_at) + '</span>' : '';
+
+        document.title = post.title + ' - My Blog';
+        document.getElementById('post-container').innerHTML =
+          '<article class="card post-detail">' +
+            '<header class="post-detail-header">' +
+              '<h1 class="post-detail-title">' + esc(post.title) + '</h1>' +
+              '<div class="post-detail-meta">' +
+                '<span>👤 ' + esc((post.profiles || {}).username || '匿名') + '</span>' +
+                '<span>🕐 ' + fmtDate(post.created_at) + '</span>' + updated +
+              '</div>' +
+              (isOwner ? '<div class="post-detail-actions"><a href="new-post.html?edit=' + post.id + '" class="btn btn-outline btn-sm">✏️ 编辑</a><button class="btn btn-danger btn-sm" id="btn-delete">🗑️ 删除</button></div>' : '') +
+            '</header>' +
+            '<div class="post-detail-content">' +
+              (mediaHtml ? '<div style="margin-bottom:1.5rem;">' + mediaHtml + '</div>' : '') +
+              esc(post.content) +
+            '</div>' +
+          '</article>' +
+          '<div style="margin-top:1rem;"><a href="index.html" class="btn btn-outline">← 返回文章列表</a></div>';
+
+        document.getElementById('btn-delete') && document.getElementById('btn-delete').addEventListener('click', async function() {
+          if (!confirm('确定要删除这篇文章吗？此操作不可撤销。')) return;
+          try {
+            var token = getToken();
+            await fetch(SUPABASE_URL + '/rest/v1/posts?id=eq.' + post.id, {
+              method: 'DELETE',
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token }
+            });
+            window.location.href = 'index.html';
+          } catch(e) { alert('删除失败: ' + e.message); }
+        });
+      } catch(e) {
+        document.getElementById('post-container').innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><h3>加载失败</h3><p>' + e.message + '</p></div>';
+      }
+    }
+
+    updateNav();
     loadPost();
   </script>
 </body>

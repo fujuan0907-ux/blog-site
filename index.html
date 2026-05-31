@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Blog</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/config.js"></script>
 </head>
 <body>
 
@@ -18,9 +17,15 @@
   </nav>
 
   <main class="container">
-    <h1 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 1.5rem;">📰 最新文章</h1>
+    <!-- 标签切换 -->
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem; flex-wrap:wrap; gap:0.75rem;">
+      <div id="tabs" style="display:flex; gap:0.5rem;">
+        <button class="btn btn-outline btn-sm active" data-tab="all" id="tab-all">📰 全部文章</button>
+        <button class="btn btn-outline btn-sm" data-tab="mine" id="tab-mine" style="display:none;">📂 我的文章</button>
+      </div>
+      <a href="new-post.html" class="btn btn-primary btn-sm" id="btn-new-post" style="display:none;">✏️ 写文章</a>
+    </div>
 
-    <!-- 静态默认内容：立即显示 -->
     <div id="posts-list">
       <div class="empty-state">
         <div class="icon">📭</div>
@@ -31,38 +36,125 @@
     </div>
   </main>
 
-  <script src="js/app.js"></script>
   <script>
-    // 后台加载文章
-    (async function() {
-      const container = document.getElementById('posts-list');
+    const SUPABASE_URL = 'https://kieznunxgzsaxxokvspx.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZXpudW54Z3pzYXh4b2t2c3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjI2NDIsImV4cCI6MjA5NTc5ODY0Mn0.9peQ-Xc6FgNYTrz9IxM9322uWfG_6tCsxd-AyP4JSkU';
+
+    // ====== 工具函数 ======
+    function getSession() { try { return JSON.parse(localStorage.getItem('sb-token')); } catch(e) { return null; } }
+    function getToken() { var s = getSession(); return s?.access_token || null; }
+    function getUser() { var s = getSession(); return s?.user || null; }
+
+    function esc(text) {
+      if (!text) return '';
+      var d = document.createElement('div'); d.textContent = text; return d.innerHTML;
+    }
+
+    function fmtDate(dateStr) {
+      var d = new Date(dateStr), n = new Date(), diff = n - d;
+      var m = Math.floor(diff / 60000), h = Math.floor(diff / 3600000), days = Math.floor(diff / 86400000);
+      if (m < 1) return '刚刚'; if (m < 60) return m + ' 分钟前';
+      if (h < 24) return h + ' 小时前'; if (days < 7) return days + ' 天前';
+      return d.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' });
+    }
+
+    function excerpt(t, max) { max = max || 150; if (!t) return ''; return t.length > max ? t.slice(0, max) + '...' : t; }
+
+    // ====== 加载文章 ======
+    var currentTab = 'all';
+    var allPosts = [];
+
+    async function loadPosts() {
       try {
-        const posts = await getPosts();
-        if (!posts || posts.length === 0) return; // 保持默认空状态
+        var params = 'select=id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)&order=created_at.desc';
+        var res = await fetch(SUPABASE_URL + '/rest/v1/posts?' + params, {
+          headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+        });
+        allPosts = await res.json();
+        renderPosts();
+      } catch(e) { console.log('加载失败:', e.message); }
+    }
 
-        container.innerHTML = posts.map(post => {
-          const thumb = post.media_urls?.find(m => m.type === 'image');
-          return `
-            <article class="post-card" onclick="location.href='post.html?id=${post.id}'">
-              ${thumb ? `<img class="post-card-thumb" src="${escapeHtml(thumb.url)}" alt="" loading="lazy">` : ''}
-              <h2 class="post-card-title">
-                <a href="post.html?id=${post.id}">${escapeHtml(post.title)}</a>
-              </h2>
-              <div class="post-card-meta">
-                <span>👤 ${escapeHtml(post.profiles?.username || '匿名')}</span>
-                <span>🕐 ${formatDate(post.created_at)}</span>
-                ${post.media_urls?.length ? `<span>📎 ${post.media_urls.length} 个附件</span>` : ''}
-              </div>
-              <p class="post-card-excerpt">${escapeHtml(excerpt(post.content))}</p>
-            </article>`;
-        }).join('');
-      } catch (e) {
-        // 加载失败，保持静态页面不变
-        console.log('文章加载失败，显示静态页面:', e.message);
+    function renderPosts() {
+      var container = document.getElementById('posts-list');
+      var user = getUser();
+      var posts = allPosts;
+
+      // 筛选
+      if (currentTab === 'mine' && user) {
+        posts = allPosts.filter(function(p) { return p.user_id === user.id; });
       }
-    })();
 
-    updateNavbar();
+      if (!posts || posts.length === 0) {
+        var msg = currentTab === 'mine' ? '你还没有发布文章' : '还没有文章';
+        var btn = currentTab === 'mine'
+          ? '<a href="new-post.html" class="btn btn-primary mt-2">✏️ 写第一篇文章</a>'
+          : (user ? '<a href="new-post.html" class="btn btn-primary mt-2">✏️ 写文章</a>' : '<a href="login.html" class="btn btn-primary mt-2">登录写文章</a>');
+        container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>' + msg + '</h3>' + btn + '</div>';
+        return;
+      }
+
+      container.innerHTML = posts.map(function(post) {
+        var thumb = (post.media_urls || []).find(function(m) { return m.type === 'image'; });
+        return '<article class="post-card" onclick="location.href=\'post.html?id=' + post.id + '\'">' +
+          (thumb ? '<img class="post-card-thumb" src="' + esc(thumb.url) + '" alt="" loading="lazy">' : '') +
+          '<h2 class="post-card-title"><a href="post.html?id=' + post.id + '">' + esc(post.title) + '</a></h2>' +
+          '<div class="post-card-meta">' +
+            '<span>👤 ' + esc((post.profiles || {}).username || '匿名') + '</span>' +
+            '<span>🕐 ' + fmtDate(post.created_at) + '</span>' +
+            ((post.media_urls || []).length ? '<span>📎 ' + post.media_urls.length + ' 个附件</span>' : '') +
+          '</div>' +
+          '<p class="post-card-excerpt">' + esc(excerpt(post.content)) + '</p>' +
+        '</article>';
+      }).join('');
+    }
+
+    // ====== 标签切换 ======
+    document.getElementById('tabs').addEventListener('click', function(e) {
+      var btn = e.target.closest('[data-tab]');
+      if (!btn) return;
+      currentTab = btn.dataset.tab;
+      document.querySelectorAll('#tabs button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderPosts();
+    });
+
+    // ====== 导航栏更新 ======
+    function updateNav() {
+      var nav = document.getElementById('nav-auth');
+      var user = getUser();
+
+      if (user) {
+        nav.innerHTML =
+          '<a href="new-post.html" class="btn btn-primary btn-sm">✏️ 写文章</a>' +
+          '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
+          '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
+
+        // 显示「我的文章」标签和新文章按钮
+        document.getElementById('tab-mine').style.display = '';
+        document.getElementById('btn-new-post').style.display = '';
+
+        // 第一次登录默认显示我的文章
+        if (currentTab === 'all') {
+          currentTab = 'mine';
+          document.getElementById('tab-all').classList.remove('active');
+          document.getElementById('tab-mine').classList.add('active');
+        }
+
+        document.getElementById('btn-logout').addEventListener('click', function(e) {
+          e.preventDefault();
+          localStorage.removeItem('sb-token');
+          window.location.href = 'index.html';
+        });
+      } else {
+        nav.innerHTML =
+          '<a href="login.html" class="btn btn-outline btn-sm">登录</a>' +
+          '<a href="register.html" class="btn btn-primary btn-sm">注册</a>';
+      }
+    }
+
+    updateNav();
+    loadPosts();
   </script>
 </body>
 </html>
