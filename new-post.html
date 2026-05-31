@@ -188,7 +188,6 @@
 
           <!-- 颜色 -->
           <input type="color" id="forecolor" title="字体颜色" value="#111827">
-          <input type="color" id="bgcolor" title="背景高亮" value="#ffff00">
           <span class="sep"></span>
 
           <!-- 对齐 -->
@@ -475,23 +474,18 @@
       }
     });
 
-    // 字体颜色（用 click + change 代替 input，避免拖动取色器时反复触发）
+    // 字体颜色：点取色器前先保存选区（因为取色器弹窗会导致选区丢失）
     var foreColorInput = document.getElementById('forecolor');
+    var savedColorSelection = null;
+    foreColorInput.addEventListener('mousedown', function() {
+      savedColorSelection = getSelection();
+    });
     foreColorInput.addEventListener('change', function() {
       var color = this.value;
-      var sel = getSelection();
-      if (!sel.selected) { showMsg('alert-error', '请先选中要改变颜色的文字'); return; }
+      var sel = savedColorSelection || getSelection();
+      savedColorSelection = null;
+      if (!sel || !sel.selected.trim()) { showMsg('alert-error', '请先选中要改变颜色的文字'); return; }
       wrapSelection('<span style="color:' + color + '">', '</span>', sel.selected);
-    });
-    // 点击取色器时先不做任何事，等 change 事件
-
-    // 背景高亮色
-    var bgColorInput = document.getElementById('bgcolor');
-    bgColorInput.addEventListener('change', function() {
-      var color = this.value;
-      var sel = getSelection();
-      if (!sel.selected) { showMsg('alert-error', '请先选中要加高亮的文字'); return; }
-      wrapSelection('<span style="background-color:' + color + '">', '</span>', sel.selected);
     });
 
     // 对齐
