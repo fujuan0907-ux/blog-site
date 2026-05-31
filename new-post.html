@@ -83,15 +83,15 @@
           </select>
           <span class="sep"></span>
 
-          <select data-cmd="fontName" title="字体" style="font-family:inherit;">
-            <option value="">字体（先选字号再打字；或选中文字后改字体）</option>
-            <option value="Noto Sans SC" style="font-family:'Noto Sans SC'">思源黑体 Noto Sans SC</option>
-            <option value="Noto Serif SC" style="font-family:'Noto Serif SC'">思源宋体 Noto Serif SC</option>
-            <option value="ZCOOL XiaoWei" style="font-family:'ZCOOL XiaoWei'">站酷小薇 ZCOOL XiaoWei</option>
-            <option value="Ma Shan Zheng" style="font-family:'Ma Shan Zheng'">马山正 Ma Shan Zheng</option>
+          <select data-cmd="fontName" title="字体">
+            <option value="">字体</option>
+            <option value="Noto Sans SC" style="font-family:'Noto Sans SC'">思源黑体</option>
+            <option value="Noto Serif SC" style="font-family:'Noto Serif SC'">思源宋体</option>
+            <option value="ZCOOL XiaoWei" style="font-family:'ZCOOL XiaoWei'">站酷小薇</option>
+            <option value="Ma Shan Zheng" style="font-family:'Ma Shan Zheng'">马山正</option>
             <option value="Roboto" style="font-family:'Roboto'">Roboto</option>
             <option value="Merriweather" style="font-family:'Merriweather'">Merriweather</option>
-            <option value="Fira Code" style="font-family:'Fira Code'">Fira Code 等宽</option>
+            <option value="Fira Code" style="font-family:'Fira Code'">Fira Code</option>
           </select>
 
           <select data-cmd="fontSize" title="字号">
@@ -225,29 +225,87 @@
       } catch(e) { showMsg('alert-error', '加载文章失败'); }
     }
 
-    // ====== 工具栏 ======
-    // 启用 CSS 模式（让 execCommand 生成 <span style="..."> 而不是废弃的 <font> 标签）
-    document.execCommand('styleWithCSS', false, true);
-
-    // 选区保存/恢复（下拉框和取色器打开时会丢失选区/焦点）
+    // ====== 核心格式化函数 ======
+    // 选区保护：select/color 打开时会清除 contentEditable 选区，提前保存
     var savedRange = null;
-    function saveRange() {
-      var s = window.getSelection();
-      if (s.rangeCount > 0 && !s.isCollapsed) savedRange = s.getRangeAt(0).cloneRange();
-      else savedRange = null;
-    }
-    function restoreFocus() {
-      editor.focus();
-      if (savedRange) {
-        var s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange);
-        savedRange = null;
-      }
-    }
     document.querySelectorAll('#toolbar select, #toolbar input[type="color"]').forEach(function(el) {
-      el.addEventListener('mousedown', saveRange);
+      el.addEventListener('mousedown', function() {
+        var s = window.getSelection();
+        if (s.rangeCount > 0 && !s.isCollapsed) savedRange = s.getRangeAt(0).cloneRange();
+        else savedRange = null;
+      });
     });
 
-    // 按钮命令
+    function getEffectiveRange() {
+      if (savedRange) {
+        var range = savedRange;
+        savedRange = null;
+        return range;
+      }
+      var sel = window.getSelection();
+      if (sel.rangeCount > 0 && !sel.isCollapsed) return sel.getRangeAt(0);
+      return null;
+    }
+
+    function applyFont(fontFamily) {
+      editor.focus();
+      var range = getEffectiveRange();
+      if (range) {
+        var frag = range.extractContents();
+        var span = document.createElement('span');
+        span.style.fontFamily = fontFamily;
+        span.appendChild(frag);
+        range.insertNode(span);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      } else {
+        editor.style.fontFamily = fontFamily;
+      }
+      updateWordCount();
+    }
+
+    function applySize(fontSize) {
+      editor.focus();
+      var range = getEffectiveRange();
+      if (range) {
+        var frag = range.extractContents();
+        var span = document.createElement('span');
+        span.style.fontSize = fontSize;
+        span.appendChild(frag);
+        range.insertNode(span);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      } else {
+        editor.style.fontSize = fontSize;
+      }
+      updateWordCount();
+    }
+
+    function applyColor(color) {
+      editor.focus();
+      var range = getEffectiveRange();
+      if (range) {
+        var frag = range.extractContents();
+        var span = document.createElement('span');
+        span.style.color = color;
+        span.appendChild(frag);
+        range.insertNode(span);
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        var nr = document.createRange();
+        nr.selectNodeContents(span);
+        sel.addRange(nr);
+      }
+      updateWordCount();
+    }
+
+    // ====== 工具栏按钮（粗体/斜体等继续用 execCommand）======
     document.getElementById('toolbar').addEventListener('click', function(e) {
       var btn = e.target.closest('button');
       if (!btn) return;
@@ -255,7 +313,6 @@
       if (!cmd) return;
       e.preventDefault();
       editor.focus();
-
       if (cmd === 'createLink') {
         var url = prompt('输入链接地址（https://...）：', 'https://');
         if (url) document.execCommand(cmd, false, url);
@@ -266,7 +323,9 @@
       updateWordCount();
     });
 
-    // 段落/字体/字号 select — 统一用 execCommand
+    // ====== 段落/字体/字号 select ======
+    var sizeMap = {'1':'12px','2':'14px','3':'16px','4':'18px','5':'20px','6':'22px','7':'24px'};
+
     document.getElementById('toolbar').addEventListener('change', function(e) {
       var selEl = e.target;
       if (selEl.tagName !== 'SELECT') return;
@@ -274,19 +333,21 @@
       var val = selEl.value;
       if (!val) return;
 
-      restoreFocus();
-      // execCommand 对选中文字生效；没选中时设置"待用样式"，后续打字自动应用
-      document.execCommand(cmd, false, val);
+      if (cmd === 'formatBlock') {
+        editor.focus();
+        document.execCommand('formatBlock', false, val);
+      } else if (cmd === 'fontName') {
+        applyFont(val);
+      } else if (cmd === 'fontSize') {
+        applySize(sizeMap[val] || val);
+      }
       selEl.value = '';
       updateWordCount();
     });
 
-    // 字体颜色
-    var foreColorInput = document.getElementById('forecolor');
-    foreColorInput.addEventListener('change', function() {
-      restoreFocus();
-      document.execCommand('foreColor', false, this.value);
-      updateWordCount();
+    // ====== 字体颜色 ======
+    document.getElementById('forecolor').addEventListener('change', function() {
+      applyColor(this.value);
     });
 
     // 字数统计
