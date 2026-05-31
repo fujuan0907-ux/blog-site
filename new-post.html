@@ -178,35 +178,80 @@
       if (!title) { showMsg('alert-error', '请输入标题'); return; }
       if (!content) { showMsg('alert-error', '请输入内容'); return; }
 
-      document.getElementById('btn-text').classList.add('hidden');
-      document.getElementById('btn-spinner').classList.remove('hidden');
-      document.getElementById('btn-submit').disabled = true;
+      // 按钮进入加载态
+      var btnText = document.getElementById('btn-text');
+      var btnSpinner = document.getElementById('btn-spinner');
+      var btnSubmit = document.getElementById('btn-submit');
+      btnText.classList.add('hidden');
+      btnSpinner.classList.remove('hidden');
+      btnSubmit.disabled = true;
+
+      function reenable() {
+        btnText.classList.remove('hidden');
+        btnSpinner.classList.add('hidden');
+        btnSubmit.disabled = false;
+      }
 
       try {
         var user = getUser();
         var token = getToken();
+        if (!user || !token) { showMsg('alert-error', '登录已过期，请重新登录'); reenable(); return; }
 
-        // 上传新图片
+        // 上传图片（失败会阻止发布）
         var imageUrls = [];
         for (var i = 0; i < uploadedImages.length; i++) {
           var img = uploadedImages[i];
           if (img.uploadedUrl) {
+            // 已上传过的图片（编辑模式），直接复用
             imageUrls.push({ type: 'image', url: img.uploadedUrl, caption: img.caption });
-          } else if (img.file) {
-            var ext = img.file.name.split('.').pop();
-            var fname = user.id + '/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.' + ext;
-            var formData = new FormData();
-            formData.append('', img.file);
-            var upRes = await fetch(SUPABASE_URL + '/storage/v1/object/post-media/' + fname, {
-              method: 'POST',
-              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token },
-              body: formData
-            });
-            if (!upRes.ok) { showMsg('alert-error', '图片上传失败'); return reenable(); }
-            imageUrls.push({ type: 'image', url: SUPABASE_URL + '/storage/v1/object/public/post-media/' + fname, caption: img.caption });
+            continue;
           }
+          if (!img.file) continue;
+
+          // 二次校验文件大小
+          if (img.file.size > 5 * 1024 * 1024) {
+            showMsg('alert-error', '❌ 图片 "' + img.file.name + '" 超过 5MB 限制（当前 ' + (img.file.size / 1024 / 1024).toFixed(1) + 'MB），请压缩后重新上传');
+            reenable(); return;
+          }
+
+          var ext = img.file.name.split('.').pop().toLowerCase();
+          if (['jpg','jpeg','png','gif','webp','svg'].indexOf(ext) === -1) {
+            showMsg('alert-error', '❌ 图片 "' + img.file.name + '" 格式不支持，请上传 JPG/PNG/GIF/WebP 格式');
+            reenable(); return;
+          }
+
+          var fname = user.id + '/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.' + ext;
+          var formData = new FormData();
+          formData.append('', img.file);
+          formData.append('cacheControl', '3600');
+
+          var upRes = await fetch(SUPABASE_URL + '/storage/v1/object/post-media/' + fname, {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token },
+            body: formData
+          });
+
+          if (!upRes.ok) {
+            var errData = await upRes.json().catch(function() { return {}; });
+            var errMsg = errData.message || errData.error || '上传失败';
+            if (upRes.status === 403 || errMsg.includes('authorization')) {
+              errMsg = 'Storage 权限不足，请在 Supabase Storage → post-media → Policies 中添加上传权限';
+            } else if (upRes.status === 413 || errMsg.includes('large')) {
+              errMsg = '图片过大，请压缩到 5MB 以内';
+            } else if (upRes.status === 404) {
+              errMsg = 'Storage bucket "post-media" 不存在，请在 Supabase Storage 中创建';
+            }
+            showMsg('alert-error', '❌ 图片上传失败: ' + errMsg);
+            reenable(); return;
+          }
+
+          var uploadedUrl = SUPABASE_URL + '/storage/v1/object/public/post-media/' + fname;
+          imageUrls.push({ type: 'image', url: uploadedUrl, caption: img.caption });
+          // 标记为已上传，如果发布失败重试时不会重复上传
+          img.uploadedUrl = uploadedUrl;
         }
 
+        // 收集视频链接
         var videoUrls = videoEntries.filter(function(v) { return v.url.trim(); }).map(function(v) {
           return { type: 'video', url: v.url.trim(), caption: v.caption };
         });
@@ -221,6 +266,7 @@
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
             body: JSON.stringify(body)
           });
+          if (!patchRes.ok) { var e1 = await patchRes.json().catch(function(){return {};}); showMsg('alert-error', '❌ 更新失败: ' + (e1.message || '请重试')); reenable(); return; }
           var patchData = await patchRes.json();
           result = patchData && patchData[0];
         } else {
@@ -230,25 +276,20 @@
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
             body: JSON.stringify(body)
           });
+          if (!postRes.ok) { var e2 = await postRes.json().catch(function(){return {};}); showMsg('alert-error', '❌ 发布失败: ' + (e2.message || '请重试')); reenable(); return; }
           var postData = await postRes.json();
           result = postData && postData[0];
         }
 
-        if (result) {
+        if (result && result.id) {
           window.location.href = 'post.html?id=' + result.id;
         } else {
-          showMsg('alert-error', '发布失败，请重试');
+          showMsg('alert-error', '❌ 发布失败：未获取到文章 ID，请重试');
           reenable();
         }
       } catch(err) {
-        showMsg('alert-error', '错误: ' + err.message);
+        showMsg('alert-error', '❌ 发生错误: ' + (err.message || '未知错误'));
         reenable();
-      }
-
-      function reenable() {
-        document.getElementById('btn-text').classList.remove('hidden');
-        document.getElementById('btn-spinner').classList.add('hidden');
-        document.getElementById('btn-submit').disabled = false;
       }
     });
   </script>
