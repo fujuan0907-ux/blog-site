@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>字体测试</title>
+<style>
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.18/index.css');
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.17/index.css');
+@import url('https://fonts.googleapis.cn/css2?family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&display=swap');
+
+body { font-family: sans-serif; padding: 20px; }
+.editor { border: 2px solid #ccc; min-height: 200px; padding: 15px; outline: none; font-size: 18px; line-height: 2; }
+select, button { font-size: 16px; padding: 6px 12px; margin: 6px 4px; }
+.result { margin-top: 12px; padding: 10px; background: #f0f0f0; border-radius: 6px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<h2>🔬 字体切换独立测试</h2>
+<p>选中下面文字，然后选字体：</p>
+
+<select id="fontSel">
+  <option value="">请选择字体</option>
+  <option value="Noto Sans SC" style="font-family:'Noto Sans SC'">思源黑体</option>
+  <option value="Noto Serif SC" style="font-family:'Noto Serif SC'">思源宋体</option>
+  <option value="ZCOOL XiaoWei" style="font-family:'ZCOOL XiaoWei'">站酷小薇</option>
+  <option value="Ma Shan Zheng" style="font-family:'Ma Shan Zheng'">马山正</option>
+</select>
+<button id="btnClear">清除格式</button>
+<button id="btnHtml">查看 HTML</button>
+
+<div class="editor" id="editor" contenteditable="true">
+  <p>床前明月光，疑是地上霜。</p>
+  <p>举头望明月，低头思故乡。</p>
+  <p>Hello World, this is a test.</p>
+</div>
+
+<div class="result" id="result"></div>
+
+<script>
+var savedRng = null;
+
+// 保存选区
+document.getElementById('fontSel').addEventListener('mousedown', function() {
+  var s = window.getSelection();
+  if (s.rangeCount && !s.isCollapsed) savedRng = s.getRangeAt(0).cloneRange();
+});
+
+document.getElementById('fontSel').addEventListener('change', function() {
+  var font = this.value;
+  if (!font) return;
+
+  var ed = document.getElementById('editor');
+  ed.focus();
+
+  // 恢复或获取选区
+  var rng = savedRng;
+  savedRng = null;
+  if (!rng) {
+    var s = window.getSelection();
+    if (s.rangeCount && !s.isCollapsed) rng = s.getRangeAt(0);
+  }
+
+  if (rng) {
+    try {
+      var frag = rng.extractContents();
+      var span = document.createElement('span');
+      span.style.fontFamily = font;
+      span.appendChild(frag);
+      rng.insertNode(span);
+      document.getElementById('result').textContent = '✅ 已包裹: <span style="font-family:' + font + '">...</span>';
+    } catch(e) {
+      document.getElementById('result').textContent = '❌ 错误: ' + e.message;
+    }
+  } else {
+    ed.style.fontFamily = font;
+    document.getElementById('result').textContent = '✅ 设为默认字体: ' + font + '（后续打字生效）';
+  }
+
+  this.value = '';
+});
+
+document.getElementById('btnClear').addEventListener('click', function() {
+  document.getElementById('editor').style.fontFamily = '';
+  document.getElementById('result').textContent = '已清除默认字体';
+});
+
+document.getElementById('btnHtml').addEventListener('click', function() {
+  document.getElementById('result').textContent = '📝 HTML:\n' + document.getElementById('editor').innerHTML;
+});
+</script>
+</body>
+</html>
