@@ -284,18 +284,18 @@
       if (cmd === 'formatBlock') {
         document.execCommand('formatBlock', false, val);
       } else if (cmd === 'fontName') {
-        try {
-          var span = document.createElement('span');
-          span.style.fontFamily = val;
-          range.surroundContents(span);
-        } catch(e) { document.execCommand('fontName', false, val); }
+        var contents = range.extractContents();
+        var span = document.createElement('span');
+        span.style.fontFamily = val;
+        span.appendChild(contents);
+        range.insertNode(span);
       } else if (cmd === 'fontSize') {
         var sizeMap = {'1':'12px','2':'14px','3':'16px','4':'18px','5':'20px','6':'22px','7':'24px'};
-        try {
-          var s = document.createElement('span');
-          s.style.fontSize = sizeMap[val] || val;
-          range.surroundContents(s);
-        } catch(e) { document.execCommand('fontSize', false, val); }
+        var contents = range.extractContents();
+        var span = document.createElement('span');
+        span.style.fontSize = sizeMap[val] || val;
+        span.appendChild(contents);
+        range.insertNode(span);
       }
       sel.value = '';
       updateWordCount();
@@ -308,9 +308,11 @@
       var sel = window.getSelection();
       if (sel.rangeCount > 0 && !sel.isCollapsed) {
         var range = sel.getRangeAt(0);
+        var contents = range.extractContents();
         var span = document.createElement('span');
         span.style.color = this.value;
-        try { range.surroundContents(span); } catch(e) { document.execCommand('foreColor', false, this.value); }
+        span.appendChild(contents);
+        range.insertNode(span);
       }
       updateWordCount();
     });

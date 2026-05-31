@@ -2,8 +2,13 @@
    Blog Site - 全局样式
    ============================================ */
 
-/* --- Google Fonts --- */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Fira+Code:wght@400&display=swap');
+/* --- 中文字体：使用 jsdelivr CDN（国内可访问） --- */
+/* 思源黑体 */
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.18/index.css');
+/* 思源宋体 */
+@import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.17/index.css');
+/* 站酷小薇 / 马山正：Google Fonts 国内镜像 */
+@import url('https://fonts.googleapis.cn/css2?family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Fira+Code:wght@400&display=swap');
 
 /* --- CSS Variables --- */
 :root {
