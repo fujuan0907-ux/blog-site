@@ -57,7 +57,7 @@
       return d.toLocaleDateString('zh-CN', { year:'numeric', month:'long', day:'numeric' });
     }
 
-    function excerpt(t, max) { max = max || 150; if (!t) return ''; return t.length > max ? t.slice(0, max) + '...' : t; }
+    function excerpt(t, max) { max = max || 150; if (!t) return ''; var plain = t.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' '); return plain.length > max ? plain.slice(0, max) + '...' : plain; }
 
     // ====== 加载文章 ======
     var currentTab = 'all';

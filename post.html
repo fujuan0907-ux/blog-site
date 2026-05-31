@@ -127,7 +127,7 @@
             '</header>' +
             '<div class="post-detail-content">' +
               (mediaHtml ? '<div style="margin-bottom:1.5rem;">' + mediaHtml + '</div>' : '') +
-              esc(post.content) +
+              (post.content || '') +
             '</div>' +
           '</article>' +
           '<div style="margin-top:1rem;"><a href="index.html" class="btn btn-outline">← 返回文章列表</a></div>';
