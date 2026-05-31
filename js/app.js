@@ -1,125 +1,240 @@
 // ============================================
-// Blog App - ES Module
-// 使用 ESM import 方式加载 Supabase
+// Blog App - 零依赖版本（纯 fetch 调用 Supabase API）
+// 无需加载任何外部库，直接使用 REST API
 // ============================================
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// 从全局获取配置（config.js 必须在此之前加载）
-const SUPABASE_URL = window.__SUPABASE_URL__;
-const SUPABASE_ANON_KEY = window.__SUPABASE_ANON_KEY__;
-const SITE_URL = window.__SITE_URL__;
+const API = {
+  url: window.__SUPABASE_URL__,
+  key: window.__SUPABASE_ANON_KEY__,
+  siteUrl: window.__SITE_URL__,
 
-if (!SUPABASE_URL || SUPABASE_URL === 'YOUR_SUPABASE_URL') {
-  console.error('⚠️ 请先在 js/config.js 中配置你的 Supabase 信息！');
+  async request(method, path, body, jwt) {
+    const headers = {
+      'apikey': this.key,
+      'Content-Type': 'application/json',
+    };
+    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+
+    const res = await fetch(`${this.url}${path}`, opts);
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) throw new Error(data?.message || data?.msg || `请求失败 (${res.status})`);
+    return data;
+  },
+
+  async uploadFile(path, file, jwt) {
+    const headers = { 'apikey': this.key };
+    if (jwt) headers['Authorization'] = `Bearer ${jwt}`;
+    const form = new FormData();
+    form.append('', file);
+    const res = await fetch(`${this.url}/storage/v1/object/${path}`, {
+      method: 'POST', headers, body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err?.message || '上传失败');
+    }
+    return res.json();
+  },
+};
+
+// ============================================
+// 认证
+// ============================================
+
+async function signUp(email, password, username) {
+  const res = await fetch(`${API.url}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, data: { username } }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.msg || '注册失败');
+  return data;
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+async function signIn(email, password) {
+  const res = await fetch(`${API.url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error_description || data?.msg || '登录失败');
+  // 保存 session 到 localStorage
+  if (data.access_token) {
+    localStorage.setItem('sb-token', JSON.stringify({
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: Date.now() + data.expires_in * 1000,
+      user: data.user,
+    }));
+  }
+  return data;
+}
+
+async function signOut() {
+  const session = getLocalSession();
+  if (session?.access_token) {
+    await fetch(`${API.url}/auth/v1/logout`, {
+      method: 'POST',
+      headers: { 'apikey': API.key, 'Authorization': `Bearer ${session.access_token}` },
+    }).catch(() => {});
+  }
+  localStorage.removeItem('sb-token');
+}
+
+async function resetPassword(email) {
+  const res = await fetch(`${API.url}/auth/v1/recover`, {
+    method: 'POST',
+    headers: { 'apikey': API.key, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data?.msg || '发送失败');
+  }
+}
+
+async function updatePassword(newPassword) {
+  const res = await fetch(`${API.url}/auth/v1/user`, {
+    method: 'PUT',
+    headers: {
+      'apikey': API.key,
+      'Authorization': `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ password: newPassword }),
+  });
+  if (!res.ok) throw new Error('更新密码失败');
+}
+
+function getLocalSession() {
+  try { return JSON.parse(localStorage.getItem('sb-token')); } catch { return null; }
+}
+
+function getAccessToken() {
+  return getLocalSession()?.access_token || null;
+}
+
+async function getCurrentUser() {
+  const token = getAccessToken();
+  if (!token) return { user: null };
+  try {
+    const res = await fetch(`${API.url}/auth/v1/user`, {
+      headers: { 'apikey': API.key, 'Authorization': `Bearer ${token}` },
+    });
+    if (!res.ok) { localStorage.removeItem('sb-token'); return { user: null }; }
+    const user = await res.json();
+    return { user };
+  } catch {
+    return { user: null };
+  }
+}
 
 // ============================================
-// 认证相关函数
+// 文章 CRUD
 // ============================================
 
-export async function signUp(email, password, username) {
-  const { data, error } = await supabase.auth.signUp({
-    email, password,
-    options: {
-      data: { username },
-      emailRedirectTo: `${SITE_URL}/login.html`,
+async function getPosts(options = {}) {
+  const params = new URLSearchParams();
+  params.set('select', 'id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)');
+  params.set('order', 'created_at.desc');
+  if (options.limit) params.set('limit', options.limit);
+  if (options.offset) params.set('offset', options.offset);
+
+  const res = await fetch(`${API.url}/rest/v1/posts?${params}`, {
+    headers: { 'apikey': API.key, 'Authorization': `Bearer ${API.key}` },
+  });
+  if (!res.ok) throw new Error('加载文章失败');
+  return await res.json();
+}
+
+async function getPostById(id) {
+  const res = await fetch(`${API.url}/rest/v1/posts?id=eq.${id}&select=id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)`, {
+    headers: { 'apikey': API.key, 'Authorization': `Bearer ${API.key}` },
+  });
+  if (!res.ok) throw new Error('文章不存在');
+  const data = await res.json();
+  return data?.[0] || null;
+}
+
+async function createPost(title, content, mediaUrls) {
+  const user = getLocalSession()?.user;
+  if (!user) throw new Error('请先登录');
+  const res = await fetch(`${API.url}/rest/v1/posts`, {
+    method: 'POST',
+    headers: {
+      'apikey': API.key,
+      'Authorization': `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify({ title, content, media_urls: mediaUrls || [], user_id: user.id }),
+  });
+  if (!res.ok) throw new Error('发布失败');
+  const data = await res.json();
+  return data?.[0] || data;
+}
+
+async function updatePost(id, title, content, mediaUrls) {
+  const res = await fetch(`${API.url}/rest/v1/posts?id=eq.${id}`, {
+    method: 'PATCH',
+    headers: {
+      'apikey': API.key,
+      'Authorization': `Bearer ${getAccessToken()}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation',
+    },
+    body: JSON.stringify({ title, content, media_urls: mediaUrls || [], updated_at: new Date().toISOString() }),
+  });
+  if (!res.ok) throw new Error('更新失败');
+  const data = await res.json();
+  return data?.[0] || data;
+}
+
+async function deletePost(id) {
+  const res = await fetch(`${API.url}/rest/v1/posts?id=eq.${id}`, {
+    method: 'DELETE',
+    headers: {
+      'apikey': API.key,
+      'Authorization': `Bearer ${getAccessToken()}`,
     },
   });
-  return { data, error };
-}
-
-export async function signIn(email, password) {
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-  return { data, error };
-}
-
-export async function signOut() {
-  const { error } = await supabase.auth.signOut();
-  return { error };
-}
-
-export async function resetPassword(email) {
-  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${SITE_URL}/update-password.html`,
-  });
-  return { data, error };
-}
-
-export async function updatePassword(newPassword) {
-  const { data, error } = await supabase.auth.updateUser({ password: newPassword });
-  return { data, error };
-}
-
-export async function getCurrentUser() {
-  const { data: { user }, error } = await supabase.auth.getUser();
-  return { user, error };
-}
-
-// ============================================
-// 文章相关函数
-// ============================================
-
-export async function getPosts(options = {}) {
-  let query = supabase
-    .from('posts')
-    .select(`id, title, content, media_urls, user_id, created_at, updated_at, profiles!posts_user_id_fkey (username)`)
-    .order('created_at', { ascending: false });
-  if (options.limit) query = query.limit(options.limit);
-  if (options.offset) query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
-  const { data, error } = await query;
-  return { data, error };
-}
-
-export async function getPostById(id) {
-  const { data, error } = await supabase
-    .from('posts')
-    .select(`id, title, content, media_urls, user_id, created_at, updated_at, profiles!posts_user_id_fkey (username)`)
-    .eq('id', id).single();
-  return { data, error };
-}
-
-export async function createPost(title, content, mediaUrls) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('请先登录');
-  const { data, error } = await supabase.from('posts').insert({
-    user_id: user.id, title, content, media_urls: mediaUrls || [],
-  }).select().single();
-  return { data, error };
-}
-
-export async function updatePost(id, title, content, mediaUrls) {
-  const { data, error } = await supabase.from('posts')
-    .update({ title, content, media_urls, updated_at: new Date() })
-    .eq('id', id).select().single();
-  return { data, error };
-}
-
-export async function deletePost(id) {
-  const { error } = await supabase.from('posts').delete().eq('id', id);
-  return { error };
+  if (!res.ok) throw new Error('删除失败');
 }
 
 // ============================================
 // 文件上传
 // ============================================
 
-export async function uploadMedia(file, userId) {
+async function uploadMedia(file, userId) {
   const fileExt = file.name.split('.').pop();
   const fileName = `${userId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-  const { data, error } = await supabase.storage.from('post-media')
-    .upload(fileName, file, { cacheControl: '3600', upsert: false });
-  if (error) return { error };
-  const { data: urlData } = supabase.storage.from('post-media').getPublicUrl(fileName);
-  return { url: urlData.publicUrl, error: null };
+  const token = getAccessToken();
+  const headers = { 'apikey': API.key };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const form = new FormData();
+  form.append('', file);
+  form.append('cacheControl', '3600');
+
+  const res = await fetch(`${API.url}/storage/v1/object/post-media/${fileName}`, {
+    method: 'POST', headers, body: form,
+  });
+  if (!res.ok) throw new Error('图片上传失败');
+  return { url: `${API.url}/storage/v1/object/public/post-media/${fileName}` };
 }
 
 // ============================================
-// UI 辅助函数
+// UI 辅助
 // ============================================
 
-export function showAlert(elementId, message) {
+function showAlert(elementId, message) {
   const el = document.getElementById(elementId);
   if (!el) return;
   el.textContent = message;
@@ -127,7 +242,7 @@ export function showAlert(elementId, message) {
   setTimeout(() => { el.style.display = 'none'; }, 5000);
 }
 
-export function formatDate(dateStr) {
+function formatDate(dateStr) {
   const date = new Date(dateStr);
   const now = new Date();
   const diff = now - date;
@@ -141,7 +256,7 @@ export function formatDate(dateStr) {
   return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export function excerpt(text, maxLen = 150) {
+function excerpt(text, maxLen = 150) {
   if (!text) return '';
   return text.length > maxLen ? text.slice(0, maxLen) + '...' : text;
 }
@@ -156,7 +271,7 @@ function getBilibiliId(url) {
   return match ? match[1] : null;
 }
 
-export function renderMedia(mediaUrls) {
+function renderMedia(mediaUrls) {
   if (!mediaUrls || mediaUrls.length === 0) return '';
   return mediaUrls.map(media => {
     let html = '<div class="post-detail-media">';
@@ -165,13 +280,9 @@ export function renderMedia(mediaUrls) {
     } else if (media.type === 'video') {
       const ytId = getYouTubeId(media.url);
       const blId = getBilibiliId(media.url);
-      if (ytId) {
-        html += `<iframe src="https://www.youtube.com/embed/${ytId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-      } else if (blId) {
-        html += `<iframe src="https://player.bilibili.com/player.html?bvid=${blId}" frameborder="0" allowfullscreen></iframe>`;
-      } else {
-        html += `<video src="${escapeHtml(media.url)}" controls></video>`;
-      }
+      if (ytId) html += `<iframe src="https://www.youtube.com/embed/${ytId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+      else if (blId) html += `<iframe src="https://player.bilibili.com/player.html?bvid=${blId}" frameborder="0" allowfullscreen></iframe>`;
+      else html += `<video src="${escapeHtml(media.url)}" controls></video>`;
     }
     if (media.caption) html += `<p class="media-caption">${escapeHtml(media.caption)}</p>`;
     html += '</div>';
@@ -179,17 +290,14 @@ export function renderMedia(mediaUrls) {
   }).join('');
 }
 
-export function escapeHtml(text) {
+function escapeHtml(text) {
+  if (!text) return '';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
 }
 
-// ============================================
-// 导航栏更新
-// ============================================
-
-export async function updateNavbar() {
+async function updateNavbar() {
   const navAuth = document.getElementById('nav-auth');
   if (!navAuth) return;
   const { user } = await getCurrentUser();

@@ -3,13 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>我的 Blog</title>
+  <title>My Blog</title>
   <link rel="stylesheet" href="css/style.css">
   <script src="js/config.js"></script>
 </head>
 <body>
 
-  <!-- 导航栏 -->
   <nav class="navbar">
     <a href="index.html" class="navbar-brand">📝 My Blog</a>
     <ul class="navbar-nav" id="nav-auth">
@@ -18,55 +17,52 @@
     </ul>
   </nav>
 
-  <!-- 主内容 -->
   <main class="container">
     <h1 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 1.5rem;">📰 最新文章</h1>
-    <div id="posts-list"><div class="loading"><div class="spinner"></div> 加载中...</div></div>
+
+    <!-- 静态默认内容：立即显示 -->
+    <div id="posts-list">
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <h3>还没有文章</h3>
+        <p>成为第一个发布文章的人吧！</p>
+        <a href="login.html" class="btn btn-primary mt-2">登录写文章</a>
+      </div>
+    </div>
   </main>
 
-  <script type="module">
-    import { getPosts, formatDate, excerpt, escapeHtml, updateNavbar } from './js/app.js';
-
-    async function loadPosts() {
+  <script src="js/app.js"></script>
+  <script>
+    // 后台加载文章
+    (async function() {
       const container = document.getElementById('posts-list');
-      const { data: posts, error } = await getPosts();
+      try {
+        const posts = await getPosts();
+        if (!posts || posts.length === 0) return; // 保持默认空状态
 
-      if (error) {
-        container.innerHTML = `<div class="alert alert-error" style="display:block">加载失败: ${escapeHtml(error.message)}</div>`;
-        return;
+        container.innerHTML = posts.map(post => {
+          const thumb = post.media_urls?.find(m => m.type === 'image');
+          return `
+            <article class="post-card" onclick="location.href='post.html?id=${post.id}'">
+              ${thumb ? `<img class="post-card-thumb" src="${escapeHtml(thumb.url)}" alt="" loading="lazy">` : ''}
+              <h2 class="post-card-title">
+                <a href="post.html?id=${post.id}">${escapeHtml(post.title)}</a>
+              </h2>
+              <div class="post-card-meta">
+                <span>👤 ${escapeHtml(post.profiles?.username || '匿名')}</span>
+                <span>🕐 ${formatDate(post.created_at)}</span>
+                ${post.media_urls?.length ? `<span>📎 ${post.media_urls.length} 个附件</span>` : ''}
+              </div>
+              <p class="post-card-excerpt">${escapeHtml(excerpt(post.content))}</p>
+            </article>`;
+        }).join('');
+      } catch (e) {
+        // 加载失败，保持静态页面不变
+        console.log('文章加载失败，显示静态页面:', e.message);
       }
-
-      if (!posts || posts.length === 0) {
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="icon">📭</div>
-            <h3>还没有文章</h3>
-            <p>成为第一个发布文章的人吧！</p>
-            <a href="new-post.html" class="btn btn-primary mt-2">✏️ 写文章</a>
-          </div>`;
-        return;
-      }
-
-      container.innerHTML = posts.map(post => {
-        const thumb = post.media_urls?.find(m => m.type === 'image');
-        return `
-          <article class="post-card" onclick="location.href='post.html?id=${post.id}'">
-            ${thumb ? `<img class="post-card-thumb" src="${escapeHtml(thumb.url)}" alt="" loading="lazy">` : ''}
-            <h2 class="post-card-title">
-              <a href="post.html?id=${post.id}">${escapeHtml(post.title)}</a>
-            </h2>
-            <div class="post-card-meta">
-              <span>👤 ${escapeHtml(post.profiles?.username || '匿名')}</span>
-              <span>🕐 ${formatDate(post.created_at)}</span>
-              ${post.media_urls?.length ? `<span>📎 ${post.media_urls.length} 个附件</span>` : ''}
-            </div>
-            <p class="post-card-excerpt">${escapeHtml(excerpt(post.content))}</p>
-          </article>`;
-      }).join('');
-    }
+    })();
 
     updateNavbar();
-    loadPosts();
   </script>
 </body>
 </html>

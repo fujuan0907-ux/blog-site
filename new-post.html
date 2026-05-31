@@ -67,8 +67,8 @@
     </div>
   </main>
 
-  <script type="module">
-    import { getCurrentUser, updateNavbar, showAlert, escapeHtml, getPostById, uploadMedia, createPost, updatePost } from './js/app.js';
+  <script src="js/app.js"></script>
+  <script>
     // ============ 权限检查 ============
     (async () => {
       const { user } = await getCurrentUser();
