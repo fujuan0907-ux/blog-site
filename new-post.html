@@ -6,114 +6,41 @@
   <title>写文章 - My Blog</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
-    /* 编辑器工具栏样式 */
     .editor-toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 2px;
-      padding: 6px 8px;
-      background: var(--gray-50);
-      border: 1.5px solid var(--gray-300);
-      border-bottom: none;
+      display: flex; flex-wrap: wrap; gap: 2px;
+      padding: 6px 8px; background: var(--gray-50);
+      border: 1.5px solid var(--gray-300); border-bottom: none;
       border-radius: var(--radius) var(--radius) 0 0;
     }
     .editor-toolbar button, .editor-toolbar select {
-      height: 30px;
-      padding: 0 8px;
-      font-size: 0.8rem;
-      border: 1px solid transparent;
-      border-radius: 4px;
-      background: transparent;
-      cursor: pointer;
-      color: var(--gray-700);
-      white-space: nowrap;
-      display: inline-flex;
-      align-items: center;
+      height: 30px; padding: 0 8px; font-size: 0.8rem;
+      border: 1px solid transparent; border-radius: 4px;
+      background: transparent; cursor: pointer; color: var(--gray-700);
+      white-space: nowrap; display: inline-flex; align-items: center;
     }
     .editor-toolbar button:hover { background: var(--gray-200); border-color: var(--gray-300); }
-    .editor-toolbar button.active { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
-    .editor-toolbar .sep {
-      width: 1px;
-      background: var(--gray-300);
-      margin: 0 4px;
-      align-self: stretch;
+    .editor-toolbar button.on { background: var(--primary-light); color: var(--primary); border-color: var(--primary); }
+    .editor-toolbar .sep { width: 1px; background: var(--gray-300); margin: 0 4px; align-self: stretch; }
+    .editor-toolbar select { max-width: 90px; appearance: auto; }
+    .editor-toolbar input[type="color"] { width: 26px; height: 26px; padding: 1px; border: 1px solid var(--gray-300); border-radius: 4px; cursor: pointer; background: white; }
+    #editor {
+      min-height: 350px; padding: 14px 16px; font-size: 1rem; line-height: 1.8;
+      border: 1.5px solid var(--gray-300); border-top: none; outline: none;
+      color: var(--gray-800); background: white; overflow-y: auto;
     }
-    .editor-toolbar select {
-      max-width: 90px;
-      appearance: auto;
-    }
-    .editor-toolbar input[type="color"] {
-      width: 26px;
-      height: 26px;
-      padding: 1px;
-      border: 1px solid var(--gray-300);
-      border-radius: 4px;
-      cursor: pointer;
-      background: white;
-    }
-    .editor-area {
-      border: 1.5px solid var(--gray-300);
-      border-top: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      position: relative;
-    }
-    #post-content {
-      width: 100%;
-      min-height: 350px;
-      padding: 12px 14px;
-      border: none;
-      border-radius: 0 0 var(--radius) var(--radius);
-      font-size: 1rem;
-      line-height: 1.7;
-      resize: vertical;
-      font-family: 'Georgia', 'Noto Serif SC', 'SimSun', serif;
-    }
-    #post-content:focus { outline: none; box-shadow: inset 0 0 0 2px var(--primary-light); }
-    #preview-pane {
-      display: none;
-      min-height: 350px;
-      padding: 16px 20px;
-      font-size: 1.05rem;
-      line-height: 1.8;
-      color: var(--gray-800);
-      overflow-y: auto;
-      background: white;
-      border-radius: 0 0 var(--radius) var(--radius);
-    }
-    #preview-pane h1 { font-size: 1.8rem; margin: 1rem 0 0.5rem; }
-    #preview-pane h2 { font-size: 1.5rem; margin: 0.8rem 0 0.4rem; }
-    #preview-pane h3 { font-size: 1.2rem; margin: 0.6rem 0 0.3rem; }
-    #preview-pane blockquote {
-      border-left: 3px solid var(--primary);
-      padding: 0.5rem 1rem;
-      margin: 0.8rem 0;
-      background: var(--gray-50);
-      color: var(--gray-600);
-    }
-    #preview-pane pre {
-      background: var(--gray-800);
-      color: #e5e7eb;
-      padding: 1rem 1.2rem;
-      border-radius: var(--radius);
-      overflow-x: auto;
-      font-family: 'Fira Code', 'Menlo', monospace;
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-    #preview-pane code { background: #f5f5f5; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
-    #preview-pane ul, #preview-pane ol { padding-left: 1.5rem; margin: 0.5rem 0; }
-    #preview-pane hr { border: none; border-top: 1px solid var(--gray-200); margin: 1.5rem 0; }
-    #preview-pane a { color: var(--primary); }
+    #editor:focus { box-shadow: inset 0 0 0 2px var(--primary-light); }
+    #editor h1 { font-size: 1.8rem; margin: 0.6rem 0 0.3rem; }
+    #editor h2 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
+    #editor h3 { font-size: 1.2rem; margin: 0.4rem 0 0.2rem; }
+    #editor blockquote { border-left: 3px solid var(--primary); padding: 0.4rem 0.8rem; margin: 0.5rem 0; background: var(--gray-50); color: var(--gray-600); }
+    #editor pre { background: var(--gray-800); color: #e5e7eb; padding: 0.8rem 1rem; border-radius: 6px; font-family: 'Menlo', 'Courier New', monospace; font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; }
+    #editor ul, #editor ol { padding-left: 1.5rem; margin: 0.4rem 0; }
+    #editor hr { border: none; border-top: 1px solid var(--gray-200); margin: 1rem 0; }
+    #editor p { margin: 0.4rem 0; }
     .editor-status {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 4px 10px;
-      font-size: 0.75rem;
-      color: var(--gray-400);
-      background: var(--gray-50);
-      border: 1.5px solid var(--gray-300);
-      border-top: none;
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 10px; font-size: 0.75rem; color: var(--gray-400);
+      background: var(--gray-50); border: 1.5px solid var(--gray-300); border-top: none;
       border-radius: 0 0 var(--radius) var(--radius);
     }
   </style>
@@ -135,7 +62,6 @@
         <div id="alert-error" class="alert alert-error" style="display:none;"></div>
         <div id="alert-success" class="alert alert-success" style="display:none;"></div>
 
-        <!-- 标题 -->
         <div class="form-group">
           <label class="form-label" for="post-title">文章标题</label>
           <input class="form-input" type="text" id="post-title" placeholder="输入文章标题..." required maxlength="255">
@@ -143,83 +69,70 @@
 
         <!-- 工具栏 -->
         <div class="editor-toolbar" id="toolbar">
-          <!-- 撤销/重做 -->
-          <button type="button" title="撤销 (Ctrl+Z)" data-cmd="undo">↩</button>
-          <button type="button" title="重做 (Ctrl+Y)" data-cmd="redo">↪</button>
+          <button type="button" title="撤销" data-cmd="undo">↩</button>
+          <button type="button" title="重做" data-cmd="redo">↪</button>
           <span class="sep"></span>
 
-          <!-- 标题 -->
-          <select id="heading-select" title="段落格式">
-            <option value="">正文</option>
+          <select data-cmd="formatBlock" title="段落格式">
+            <option value="p">正文</option>
             <option value="h1">标题 H1</option>
             <option value="h2">标题 H2</option>
             <option value="h3">标题 H3</option>
+            <option value="blockquote">引用块</option>
+            <option value="pre">代码块</option>
           </select>
           <span class="sep"></span>
 
-          <!-- 字体 -->
-          <select id="font-select" title="字体">
-            <option value="">默认</option>
-            <option value="SimSun, serif">宋体</option>
-            <option value="SimHei, sans-serif">黑体</option>
-            <option value="KaiTi, serif">楷体</option>
-            <option value="Microsoft YaHei, sans-serif">微软雅黑</option>
-            <option value="Georgia, serif">Georgia</option>
-            <option value="Arial, sans-serif">Arial</option>
-            <option value="Courier New, monospace">等宽</option>
+          <select data-cmd="fontName" title="字体">
+            <option value="">字体</option>
+            <option value="SimSun">宋体</option>
+            <option value="SimHei">黑体</option>
+            <option value="KaiTi">楷体</option>
+            <option value="Microsoft YaHei">微软雅黑</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Arial">Arial</option>
+            <option value="Courier New">等宽</option>
           </select>
 
-          <!-- 字号 -->
-          <select id="size-select" title="字号">
-            <option value="">默认</option>
-            <option value="12px">小</option>
-            <option value="16px">正常</option>
-            <option value="20px">大</option>
-            <option value="24px">特大</option>
+          <select data-cmd="fontSize" title="字号">
+            <option value="">字号</option>
+            <option value="1">小</option>
+            <option value="3">正常</option>
+            <option value="5">大</option>
+            <option value="7">特大</option>
           </select>
           <span class="sep"></span>
 
-          <!-- 内联样式 -->
           <button type="button" title="粗体 (Ctrl+B)" data-cmd="bold"><b>B</b></button>
           <button type="button" title="斜体 (Ctrl+I)" data-cmd="italic"><i>I</i></button>
           <button type="button" title="下划线 (Ctrl+U)" data-cmd="underline"><u>U</u></button>
           <button type="button" title="删除线" data-cmd="strikethrough"><s>S</s></button>
           <span class="sep"></span>
 
-          <!-- 颜色 -->
           <input type="color" id="forecolor" title="字体颜色" value="#111827">
           <span class="sep"></span>
 
-          <!-- 对齐 -->
-          <button type="button" title="左对齐" data-cmd="left">⫷</button>
-          <button type="button" title="居中" data-cmd="center">≣</button>
-          <button type="button" title="右对齐" data-cmd="right">⫸</button>
+          <button type="button" title="左对齐" data-cmd="justifyLeft">⫷</button>
+          <button type="button" title="居中" data-cmd="justifyCenter">≣</button>
+          <button type="button" title="右对齐" data-cmd="justifyRight">⫸</button>
           <span class="sep"></span>
 
-          <!-- 列表 -->
-          <button type="button" title="无序列表" data-cmd="ul">• 列表</button>
-          <button type="button" title="有序列表" data-cmd="ol">1. 编号</button>
+          <button type="button" title="无序列表" data-cmd="insertUnorderedList">• 列表</button>
+          <button type="button" title="有序列表" data-cmd="insertOrderedList">1. 编号</button>
           <span class="sep"></span>
 
-          <!-- 引用/代码/分隔线/链接 -->
-          <button type="button" title="引用块" data-cmd="blockquote">❝</button>
-          <button type="button" title="代码块" data-cmd="code">⟨⟩</button>
-          <button type="button" title="分隔线" data-cmd="hr">—</button>
-          <button type="button" title="插入链接" data-cmd="link">🔗</button>
+          <button type="button" title="分隔线" data-cmd="insertHorizontalRule">—</button>
+          <button type="button" title="插入链接" data-cmd="createLink">🔗</button>
           <span class="sep"></span>
 
-          <!-- 切换 -->
-          <button type="button" title="预览" id="btn-preview" style="margin-left:auto;">👁 预览</button>
+          <button type="button" title="清除格式" data-cmd="removeFormat" style="margin-left:auto;">✕ 清除格式</button>
         </div>
 
-        <!-- 编辑区 -->
-        <div class="editor-area">
-          <textarea class="form-textarea" id="post-content" placeholder="在这里写下你的想法...&#10;&#10;选中文字后使用上方工具栏格式化" required></textarea>
-          <div id="preview-pane"></div>
-        </div>
-        <div class="editor-status" id="editor-status">
+        <!-- 所见即所得编辑区 -->
+        <div id="editor" contenteditable="true"><p><br></p></div>
+        <div class="editor-status">
           <span id="word-count">0 字</span>
-          <span id="mode-indicator">编辑模式</span>
+          <span>所见即所得编辑器</span>
         </div>
       </div>
 
@@ -244,17 +157,14 @@
         </div>
       </div>
 
-      <!-- 按钮 -->
       <div style="padding:1rem 1.5rem 1.5rem; display:flex; gap:0.75rem;">
-        <button type="submit" class="btn btn-primary" id="btn-submit" form="post-form">
+        <button type="button" class="btn btn-primary" id="btn-submit">
           <span id="btn-text">发布文章</span>
           <span class="spinner hidden" id="btn-spinner"></span>
         </button>
         <a href="index.html" class="btn btn-outline">取消</a>
       </div>
     </div>
-
-    <form id="post-form" style="display:none;"></form>
   </main>
 
   <script>
@@ -265,12 +175,11 @@
     function getToken() { var s = getSession(); return s?.access_token || null; }
     function getUser() { var s = getSession(); return s?.user || null; }
     function esc(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-    function showMsg(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 5000); }
+    function showMsg(id, msg) { var el = document.getElementById(id); el.textContent = msg; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 4000); }
 
     // ====== 权限 ======
     var user = getUser();
     if (!user) { window.location.href = 'login.html'; }
-
     (function() {
       var nav = document.getElementById('nav-auth');
       nav.innerHTML = '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
@@ -282,6 +191,8 @@
 
     // ====== 编辑模式 ======
     var editingId = new URLSearchParams(window.location.search).get('edit') || null;
+    var editor = document.getElementById('editor');
+
     if (editingId) {
       document.getElementById('page-title').textContent = '✏️ 编辑文章';
       document.getElementById('btn-text').textContent = '保存修改';
@@ -297,7 +208,7 @@
         var post = posts && posts[0];
         if (post) {
           document.getElementById('post-title').value = post.title || '';
-          document.getElementById('post-content').value = post.content || '';
+          editor.innerHTML = post.content || '<p><br></p>';
           updateWordCount();
           if (post.media_urls) {
             post.media_urls.forEach(function(m) {
@@ -314,294 +225,112 @@
       } catch(e) { showMsg('alert-error', '加载文章失败'); }
     }
 
-    // ====== 工具栏逻辑 ======
-    var textarea = document.getElementById('post-content');
-    var historyStack = [];
-    var historyIdx = -1;
+    // ====== 工具栏 - 全部使用 execCommand ======
+    document.getElementById('toolbar').addEventListener('click', function(e) {
+      var btn = e.target.closest('button');
+      if (!btn) return;
+      var cmd = btn.dataset.cmd;
+      if (!cmd) return;
+      e.preventDefault();
+
+      editor.focus();
+
+      if (cmd === 'createLink') {
+        var url = prompt('输入链接地址（https://...）：', 'https://');
+        if (url) document.execCommand(cmd, false, url);
+        return;
+      }
+
+      if (cmd === 'undo' || cmd === 'redo') {
+        document.execCommand(cmd);
+        return;
+      }
+
+      // 标题 / 引用 / 代码块：先确保选区落在段落内
+      if (cmd === 'formatBlock') return; // handled by select change
+      if (cmd === 'fontName') return;     // handled by select change
+      if (cmd === 'fontSize') return;     // handled by select change
+
+      document.execCommand(cmd, false, null);
+      updateWordCount();
+    });
+
+    // Select 类型的命令
+    document.getElementById('toolbar').addEventListener('change', function(e) {
+      var sel = e.target;
+      if (sel.tagName !== 'SELECT') return;
+      var cmd = sel.dataset.cmd;
+      var val = sel.value;
+
+      editor.focus();
+
+      if (cmd === 'formatBlock') {
+        if (val === 'blockquote' || val === 'pre') {
+          document.execCommand('formatBlock', false, val);
+        } else {
+          document.execCommand('formatBlock', false, val);
+        }
+        sel.value = '';
+        updateWordCount();
+        return;
+      }
+
+      if (cmd === 'fontName' && val) {
+        document.execCommand('fontName', false, val);
+        sel.value = '';
+        updateWordCount();
+        return;
+      }
+
+      if (cmd === 'fontSize' && val) {
+        document.execCommand('fontSize', false, val);
+        sel.value = '';
+        updateWordCount();
+        return;
+      }
+    });
+
+    // 字体颜色
+    var foreColorInput = document.getElementById('forecolor');
+    foreColorInput.addEventListener('change', function() {
+      editor.focus();
+      document.execCommand('foreColor', false, this.value);
+      updateWordCount();
+    });
 
     // 字数统计
     function updateWordCount() {
-      var len = textarea.value.replace(/\s/g, '').length;
-      document.getElementById('word-count').textContent = len + ' 字';
+      var text = (editor.textContent || '').replace(/\s+/g, '');
+      document.getElementById('word-count').textContent = text.length + ' 字';
     }
-    textarea.addEventListener('input', updateWordCount);
+    editor.addEventListener('input', updateWordCount);
 
-    // 保存历史
-    function saveHistory() {
-      historyStack = historyStack.slice(0, historyIdx + 1);
-      historyStack.push(textarea.value);
-      if (historyStack.length > 50) historyStack.shift();
-      historyIdx = historyStack.length - 1;
-    }
-
-    textarea.addEventListener('input', function() {
-      saveHistory();
-      updateWordCount();
-    });
-
-    // 撤销/重做
-    document.querySelector('[data-cmd="undo"]').addEventListener('click', function() {
-      if (historyIdx > 0) {
-        historyIdx--;
-        textarea.value = historyStack[historyIdx];
-        updateWordCount();
-      }
-    });
-    document.querySelector('[data-cmd="redo"]').addEventListener('click', function() {
-      if (historyIdx < historyStack.length - 1) {
-        historyIdx++;
-        textarea.value = historyStack[historyIdx];
-        updateWordCount();
-      }
-    });
-
-    // 获取选中文本信息
-    function getSelection() {
-      var start = textarea.selectionStart;
-      var end = textarea.selectionEnd;
-      var text = textarea.value;
-      var before = text.substring(0, start);
-      var selected = text.substring(start, end);
-      var after = text.substring(end);
-      return { start: start, end: end, before: before, selected: selected, after: after };
-    }
-
-    function replaceSelection(newText, cursorOffset) {
-      var sel = getSelection();
-      textarea.value = sel.before + newText + sel.after;
-      var pos = sel.start + cursorOffset;
-      textarea.focus();
-      textarea.setSelectionRange(pos, pos);
-      saveHistory();
-      updateWordCount();
-    }
-
-    // 包裹选中文字
-    function wrapSelection(openTag, closeTag, placeholder) {
-      var sel = getSelection();
-      var text = sel.selected || (placeholder || '');
-      var wrapped = openTag + text + closeTag;
-      textarea.value = sel.before + wrapped + sel.after;
-      var newStart = sel.start + openTag.length;
-      var newEnd = newStart + text.length;
-      textarea.focus();
-      textarea.setSelectionRange(newStart, newEnd);
-      saveHistory();
-      updateWordCount();
-    }
-
-    // 包裹整行（用于块级元素）
-    function wrapBlock(tag) {
-      var sel = getSelection();
-      // 找到选中区域所在的行
-      var allBefore = sel.before;
-      var lineStart = allBefore.lastIndexOf('\n') + 1;
-      var lineEndBefore = sel.after.indexOf('\n');
-      var lineEnd = lineEndBefore === -1 ? sel.after.length : lineEndBefore + sel.start + sel.selected.length;
-
-      var beforeLine = textarea.value.substring(0, lineStart);
-      var lineContent = textarea.value.substring(lineStart, lineEnd);
-      var afterLine = textarea.value.substring(lineEnd);
-
-      if (!lineContent.trim()) {
-        lineContent = placeholder || '在此输入内容';
-      }
-
-      var wrapped = '<' + tag + '>' + lineContent + '</' + tag + '>\n';
-      textarea.value = beforeLine + wrapped + afterLine.trimStart();
-      textarea.focus();
-      textarea.setSelectionRange(lineStart, lineStart + wrapped.length);
-      saveHistory();
-      updateWordCount();
-    }
-
-    // 标题
-    document.getElementById('heading-select').addEventListener('change', function() {
-      var tag = this.value;
-      if (!tag) {
-        // 移除当前行的块级标签
-        var sel = getSelection();
-        var lineStart = sel.before.lastIndexOf('\n') + 1;
-        var lineEnd = sel.after.indexOf('\n');
-        if (lineEnd === -1) lineEnd = sel.after.length;
-        else lineEnd += sel.start + sel.selected.length;
-        var line = textarea.value.substring(lineStart, lineEnd);
-        line = line.replace(/<\/?h[123]>/gi, '');
-        textarea.value = textarea.value.substring(0, lineStart) + line + textarea.value.substring(lineEnd);
-        saveHistory();
-        updateWordCount();
-        this.value = '';
-        return;
-      }
-      wrapBlock(tag);
-      this.value = '';
-    });
-
-    // 字体
-    document.getElementById('font-select').addEventListener('change', function() {
-      var font = this.value;
-      if (!font) return;
-      var sel = getSelection();
-      if (!sel.selected) { showMsg('alert-error', '请先选中要改变字体的文字'); this.value = ''; return; }
-      wrapSelection('<span style="font-family:' + font + '">', '</span>', sel.selected);
-      this.value = '';
-    });
-
-    // 字号
-    document.getElementById('size-select').addEventListener('change', function() {
-      var size = this.value;
-      if (!size) return;
-      var sel = getSelection();
-      if (!sel.selected) { showMsg('alert-error', '请先选中要改变字号的文字'); this.value = ''; return; }
-      wrapSelection('<span style="font-size:' + size + '">', '</span>', sel.selected);
-      this.value = '';
-    });
-
-    // 内联样式按钮
-    var inlineTags = {
-      bold: ['<b>', '</b>'],
-      italic: ['<i>', '</i>'],
-      underline: ['<u>', '</u>'],
-      strikethrough: ['<s>', '</s>'],
-    };
-    Object.keys(inlineTags).forEach(function(cmd) {
-      var btn = document.querySelector('[data-cmd="' + cmd + '"]');
-      if (btn) {
-        btn.addEventListener('click', function() {
-          var tags = inlineTags[cmd];
-          wrapSelection(tags[0], tags[1], cmd === 'bold' ? '粗体' : cmd === 'italic' ? '斜体' : cmd === 'underline' ? '下划线' : '删除线');
-        });
-      }
-    });
-
-    // 字体颜色：点取色器前先保存选区（因为取色器弹窗会导致选区丢失）
-    var foreColorInput = document.getElementById('forecolor');
-    var savedColorSelection = null;
-    foreColorInput.addEventListener('mousedown', function() {
-      savedColorSelection = getSelection();
-    });
-    foreColorInput.addEventListener('change', function() {
-      var color = this.value;
-      var sel = savedColorSelection || getSelection();
-      savedColorSelection = null;
-      if (!sel || !sel.selected.trim()) { showMsg('alert-error', '请先选中要改变颜色的文字'); return; }
-      wrapSelection('<span style="color:' + color + '">', '</span>', sel.selected);
-    });
-
-    // 对齐
-    var aligns = { left: 'left', center: 'center', right: 'right' };
-    Object.keys(aligns).forEach(function(cmd) {
-      document.querySelector('[data-cmd="' + cmd + '"]').addEventListener('click', function() {
-        var val = aligns[cmd];
-        wrapSelection('<div style="text-align:' + val + '">', '</div>', '段落');
-      });
-    });
-
-    // 列表
-    document.querySelector('[data-cmd="ul"]').addEventListener('click', function() {
-      var sel = getSelection();
-      var lines = sel.selected.split('\n').filter(function(l) { return l.trim(); });
-      if (lines.length === 0) lines = ['列表项'];
-      var html = '<ul>\n' + lines.map(function(l) { return '  <li>' + l.trim() + '</li>'; }).join('\n') + '\n</ul>\n';
-      replaceSelection(html, html.length);
-    });
-
-    document.querySelector('[data-cmd="ol"]').addEventListener('click', function() {
-      var sel = getSelection();
-      var lines = sel.selected.split('\n').filter(function(l) { return l.trim(); });
-      if (lines.length === 0) lines = ['列表项'];
-      var html = '<ol>\n' + lines.map(function(l) { return '  <li>' + l.trim() + '</li>'; }).join('\n') + '\n</ol>\n';
-      replaceSelection(html, html.length);
-    });
-
-    // 引用
-    document.querySelector('[data-cmd="blockquote"]').addEventListener('click', function() {
-      wrapSelection('<blockquote>', '</blockquote>', '引用内容');
-    });
-
-    // 代码块
-    document.querySelector('[data-cmd="code"]').addEventListener('click', function() {
-      wrapSelection('<pre><code>', '</code></pre>', '代码');
-    });
-
-    // 分隔线
-    document.querySelector('[data-cmd="hr"]').addEventListener('click', function() {
-      var sel = getSelection();
-      textarea.value = sel.before + '\n<hr>\n' + sel.after;
-      saveHistory();
-      updateWordCount();
-      textarea.focus();
-    });
-
-    // 链接
-    document.querySelector('[data-cmd="link"]').addEventListener('click', function() {
-      var url = prompt('输入链接地址（https://...）：', 'https://');
-      if (!url) return;
-      var sel = getSelection();
-      var text = sel.selected || url;
-      wrapSelection('<a href="' + url + '" target="_blank">', '</a>', text);
-    });
-
-    // Ctrl+B/I/U 快捷键
-    textarea.addEventListener('keydown', function(e) {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey) {
-        if (e.key === 'b') { e.preventDefault(); document.querySelector('[data-cmd="bold"]').click(); }
-        if (e.key === 'i') { e.preventDefault(); document.querySelector('[data-cmd="italic"]').click(); }
-        if (e.key === 'u') { e.preventDefault(); document.querySelector('[data-cmd="underline"]').click(); }
-        if (e.key === 'z') { e.preventDefault(); document.querySelector('[data-cmd="undo"]').click(); }
-        if (e.key === 'y') { e.preventDefault(); document.querySelector('[data-cmd="redo"]').click(); }
-      }
-    });
-
-    // ====== 预览切换 ======
-    var isPreview = false;
-    document.getElementById('btn-preview').addEventListener('click', function() {
-      isPreview = !isPreview;
-      var txt = document.getElementById('post-content');
-      var preview = document.getElementById('preview-pane');
-      var btn = document.getElementById('btn-preview');
-      var indicator = document.getElementById('mode-indicator');
-
-      if (isPreview) {
-        preview.innerHTML = txt.value || '<p style="color:var(--gray-400);">暂无内容</p>';
-        preview.style.display = 'block';
-        txt.style.display = 'none';
-        btn.innerHTML = '✏️ 编辑';
-        btn.classList.add('active');
-        indicator.textContent = '预览模式';
-      } else {
-        preview.style.display = 'none';
-        txt.style.display = '';
-        btn.innerHTML = '👁 预览';
-        btn.classList.remove('active');
-        indicator.textContent = '编辑模式';
-      }
-    });
+    // 初始字数
+    setTimeout(updateWordCount, 100);
 
     // ====== 图片处理 ======
     var uploadedImages = [];
-    var imgIdCounter = 0;
+    var ALLOWED_EXT = ['jpg','jpeg','png','gif','webp','svg','heic','heif','bmp','tiff','tif'];
 
     document.getElementById('image-drop').addEventListener('click', function() { document.getElementById('image-input').click(); });
-
     var dropZone = document.getElementById('image-drop');
     dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
     dropZone.addEventListener('dragleave', function(e) { dropZone.style.borderColor = ''; });
     dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.style.borderColor = ''; addImages(e.dataTransfer.files); });
-
     document.getElementById('image-input').addEventListener('change', function(e) { addImages(e.target.files); e.target.value = ''; });
 
-    var ALLOWED_EXT = ['jpg','jpeg','png','gif','webp','svg','heic','heif','bmp','tiff','tif'];
-
     function addImages(files) {
-      if (!files || files.length === 0) return;
+      if (!files || !files.length) return;
       var added = 0;
       Array.from(files).forEach(function(file) {
         var ext = (file.name.split('.').pop() || '').toLowerCase();
-        var isImage = file.type.startsWith('image/') || ALLOWED_EXT.indexOf(ext) !== -1;
-        if (!isImage) { showMsg('alert-error', '❌ "' + file.name + '" 不是图片文件（类型: ' + (file.type || '未知') + '）'); return; }
-        if (file.size > 5*1024*1024) { showMsg('alert-error', '❌ "' + file.name + '" 超过 5MB（当前 ' + (file.size/1024/1024).toFixed(1) + 'MB）'); return; }
-        uploadedImages.push({ id: ++imgIdCounter, file: file, previewUrl: URL.createObjectURL(file), uploadedUrl: null, caption: '' });
+        if (!file.type.startsWith('image/') && ALLOWED_EXT.indexOf(ext) === -1) {
+          showMsg('alert-error', '❌ "' + file.name + '" 不是图片'); return;
+        }
+        if (file.size > 5*1024*1024) {
+          showMsg('alert-error', '❌ "' + file.name + '" 超过 5MB'); return;
+        }
+        uploadedImages.push({ file: file, previewUrl: URL.createObjectURL(file), uploadedUrl: null, caption: '' });
         added++;
       });
       if (added > 0) showMsg('alert-success', '✅ 已选择 ' + added + ' 张图片');
@@ -610,7 +339,7 @@
 
     function renderImagePreviews() {
       var container = document.getElementById('image-previews');
-      if (uploadedImages.length === 0) { container.innerHTML = ''; return; }
+      if (!uploadedImages.length) { container.innerHTML = ''; return; }
       var html = '';
       uploadedImages.forEach(function(img, i) {
         var src = img.previewUrl || img.uploadedUrl || '';
@@ -620,42 +349,54 @@
           '<input class="form-input" placeholder="说明（可选）" style="width:120px;font-size:0.75rem;padding:0.25rem;display:inline-block;vertical-align:top;margin:4px;" value="' + esc(img.caption) + '" data-idx="' + i + '">';
       });
       container.innerHTML = html;
-      container.querySelectorAll('.media-preview-remove').forEach(function(b) { b.addEventListener('click', function() { removeImg(parseInt(this.dataset.idx)); }); });
-      container.querySelectorAll('input[data-idx]').forEach(function(b) { b.addEventListener('input', function() { var i = parseInt(this.dataset.idx); if (uploadedImages[i]) uploadedImages[i].caption = this.value; }); });
+      container.querySelectorAll('.media-preview-remove').forEach(function(b) {
+        b.addEventListener('click', function() { removeImg(parseInt(this.dataset.idx)); });
+      });
+      container.querySelectorAll('input[data-idx]').forEach(function(b) {
+        b.addEventListener('input', function() {
+          var i = parseInt(this.dataset.idx);
+          if (uploadedImages[i]) uploadedImages[i].caption = this.value;
+        });
+      });
     }
 
-    function removeImg(idx) { var img = uploadedImages[idx]; if (img && img.previewUrl && img.previewUrl.startsWith('blob:')) URL.revokeObjectURL(img.previewUrl); uploadedImages.splice(idx,1); renderImagePreviews(); }
+    function removeImg(idx) {
+      var img = uploadedImages[idx];
+      if (img && img.previewUrl && img.previewUrl.startsWith('blob:')) URL.revokeObjectURL(img.previewUrl);
+      uploadedImages.splice(idx, 1);
+      renderImagePreviews();
+    }
 
     // ====== 视频 ======
     var videoEntries = [];
-    document.getElementById('btn-add-video').addEventListener('click', function() { videoEntries.push({ url: '', caption: '' }); renderVideoInputs(); });
+    document.getElementById('btn-add-video').addEventListener('click', function() {
+      videoEntries.push({ url: '', caption: '' }); renderVideoInputs();
+    });
 
     function renderVideoInputs() {
       var html = '';
       videoEntries.forEach(function(v, i) {
         html += '<div class="video-url-row">' +
           '<input class="form-input" placeholder="视频 URL" value="' + esc(v.url) + '">' +
-          '<input class="form-input" placeholder="说明（可选）" style="max-width:160px;" value="' + esc(v.caption) + '">' +
+          '<input class="form-input" placeholder="说明" style="max-width:160px;" value="' + esc(v.caption) + '">' +
           '<button type="button" class="btn btn-outline btn-sm">✕</button></div>';
       });
       document.getElementById('video-list').innerHTML = html;
       document.querySelectorAll('#video-list .video-url-row').forEach(function(row, i) {
         row.querySelectorAll('input')[0].addEventListener('input', function() { videoEntries[i].url = this.value; });
         row.querySelectorAll('input')[1].addEventListener('input', function() { videoEntries[i].caption = this.value; });
-        row.querySelector('button').addEventListener('click', function() { videoEntries.splice(i,1); renderVideoInputs(); });
+        row.querySelector('button').addEventListener('click', function() { videoEntries.splice(i, 1); renderVideoInputs(); });
       });
     }
 
     // ====== 提交 ======
     document.getElementById('btn-submit').addEventListener('click', async function(e) {
       e.preventDefault();
-      // 如果在预览模式，先获取 textarea 的值
-      if (isPreview) {
-        // preview mode - textarea still has the original value
-      }
 
       var title = document.getElementById('post-title').value.trim();
-      var content = textarea.value.trim();
+      var content = editor.innerHTML.trim();
+      if (content === '<p><br></p>') content = '';
+
       if (!title) { showMsg('alert-error', '请输入标题'); return; }
       if (!content) { showMsg('alert-error', '请输入内容'); return; }
 
@@ -678,31 +419,26 @@
           var img = uploadedImages[i];
           if (img.uploadedUrl) { imageUrls.push({ type: 'image', url: img.uploadedUrl, caption: img.caption }); continue; }
           if (!img.file) continue;
-
-          if (img.file.size > 5*1024*1024) { showMsg('alert-error', '❌ "' + img.file.name + '" 超过 5MB'); reenable(); return; }
+          if (img.file.size > 5*1024*1024) { showMsg('alert-error', '❌ 图片超过 5MB'); reenable(); return; }
 
           var ext = img.file.name.split('.').pop().toLowerCase();
           if (ALLOWED_EXT.indexOf(ext) === -1) { showMsg('alert-error', '❌ 格式不支持'); reenable(); return; }
 
           var fname = user.id + '/' + Date.now() + '_' + Math.random().toString(36).slice(2) + '.' + ext;
-          var formData = new FormData();
-          formData.append('', img.file);
-          formData.append('cacheControl', '3600');
+          var fd = new FormData();
+          fd.append('', img.file);
+          fd.append('cacheControl', '3600');
 
           var upRes = await fetch(SUPABASE_URL + '/storage/v1/object/post-media/' + fname, {
             method: 'POST',
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token },
-            body: formData
+            body: fd
           });
-
           if (!upRes.ok) {
             var errData = await upRes.json().catch(function() { return {}; });
-            var errMsg = errData.message || errData.error || '上传失败';
-            if (upRes.status === 403) errMsg = 'Storage 权限不足，请检查 Supabase Storage Policies';
-            showMsg('alert-error', '❌ 图片上传失败: ' + errMsg);
+            showMsg('alert-error', '❌ 上传失败: ' + (errData.message || '请重试'));
             reenable(); return;
           }
-
           var uploadedUrl = SUPABASE_URL + '/storage/v1/object/public/post-media/' + fname;
           imageUrls.push({ type: 'image', url: uploadedUrl, caption: img.caption });
           img.uploadedUrl = uploadedUrl;
@@ -722,9 +458,9 @@
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
             body: JSON.stringify(body)
           });
-          if (!patchRes.ok) { var e1 = await patchRes.json().catch(function(){return {};}); showMsg('alert-error', '❌ 更新失败: ' + (e1.message||'请重试')); reenable(); return; }
-          var patchData = await patchRes.json();
-          result = patchData && patchData[0];
+          if (!patchRes.ok) { showMsg('alert-error', '❌ 更新失败'); reenable(); return; }
+          var pd = await patchRes.json();
+          result = pd && pd[0];
         } else {
           body.user_id = user.id;
           var postRes = await fetch(SUPABASE_URL + '/rest/v1/posts', {
@@ -732,15 +468,15 @@
             headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
             body: JSON.stringify(body)
           });
-          if (!postRes.ok) { var e2 = await postRes.json().catch(function(){return {};}); showMsg('alert-error', '❌ 发布失败: ' + (e2.message||'请重试')); reenable(); return; }
-          var postData = await postRes.json();
-          result = postData && postData[0];
+          if (!postRes.ok) { showMsg('alert-error', '❌ 发布失败'); reenable(); return; }
+          var d = await postRes.json();
+          result = d && d[0];
         }
 
         if (result && result.id) {
           window.location.href = 'post.html?id=' + result.id;
         } else {
-          showMsg('alert-error', '❌ 发布失败，请重试');
+          showMsg('alert-error', '❌ 发布失败');
           reenable();
         }
       } catch(err) {
@@ -748,10 +484,6 @@
         reenable();
       }
     });
-
-    // 初始化
-    saveHistory();
-    updateWordCount();
   </script>
 </body>
 </html>
