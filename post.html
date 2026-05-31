@@ -62,7 +62,6 @@
       var user = getUser();
       if (user) {
         nav.innerHTML =
-          '<a href="new-post.html" class="btn btn-primary btn-sm">✏️ 写文章</a>' +
           '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
           '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
         document.getElementById('btn-logout').addEventListener('click', function(e) {

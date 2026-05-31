@@ -87,9 +87,9 @@
 
       if (!posts || posts.length === 0) {
         var msg = currentTab === 'mine' ? '你还没有发布文章' : '还没有文章';
-        var btn = currentTab === 'mine'
-          ? '<a href="new-post.html" class="btn btn-primary mt-2">✏️ 写第一篇文章</a>'
-          : (user ? '<a href="new-post.html" class="btn btn-primary mt-2">✏️ 写文章</a>' : '<a href="login.html" class="btn btn-primary mt-2">登录写文章</a>');
+        var btn = user
+          ? '<a href="new-post.html" class="btn btn-primary mt-2">✏️ 写文章</a>'
+          : '<a href="login.html" class="btn btn-primary mt-2">登录写文章</a>';
         container.innerHTML = '<div class="empty-state"><div class="icon">📭</div><h3>' + msg + '</h3>' + btn + '</div>';
         return;
       }
@@ -126,7 +126,6 @@
 
       if (user) {
         nav.innerHTML =
-          '<a href="new-post.html" class="btn btn-primary btn-sm">✏️ 写文章</a>' +
           '<a href="profile.html" style="font-weight:600;color:var(--primary);">👤 ' + esc(user.email) + '</a>' +
           '<a href="#" id="btn-logout" class="btn btn-outline btn-sm">退出</a>';
 
