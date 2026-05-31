@@ -225,85 +225,79 @@
       } catch(e) { showMsg('alert-error', '加载文章失败'); }
     }
 
-    // ====== 核心格式化函数 ======
-    // 选区保护：select/color 打开时会清除 contentEditable 选区，提前保存
-    var savedRange = null;
+    // ====== 格式化逻辑（与 font-test.html 完全相同）======
+    var savedRng = null;
+
+    // mousedown 时保存选区
     document.querySelectorAll('#toolbar select, #toolbar input[type="color"]').forEach(function(el) {
       el.addEventListener('mousedown', function() {
         var s = window.getSelection();
-        if (s.rangeCount > 0 && !s.isCollapsed) savedRange = s.getRangeAt(0).cloneRange();
-        else savedRange = null;
+        if (s.rangeCount && !s.isCollapsed) savedRng = s.getRangeAt(0).cloneRange();
       });
     });
 
-    function getEffectiveRange() {
-      if (savedRange) {
-        var range = savedRange;
-        savedRange = null;
-        return range;
-      }
-      var sel = window.getSelection();
-      if (sel.rangeCount > 0 && !sel.isCollapsed) return sel.getRangeAt(0);
-      return null;
-    }
+    // change 时应用格式
+    document.getElementById('toolbar').addEventListener('change', function(e) {
+      var selEl = e.target;
+      if (selEl.tagName !== 'SELECT') return;
+      var cmd = selEl.dataset.cmd;
+      var val = selEl.value;
+      if (!val) return;
 
-    function applyFont(fontFamily) {
       editor.focus();
-      var range = getEffectiveRange();
+      var range = savedRng;
+      savedRng = null;
+      if (!range) {
+        var s = window.getSelection();
+        if (s.rangeCount && !s.isCollapsed) range = s.getRangeAt(0);
+      }
+
+      if (cmd === 'formatBlock') {
+        document.execCommand('formatBlock', false, val);
+      } else if (cmd === 'fontName') {
+        if (range) {
+          var frag = range.extractContents();
+          var span = document.createElement('span');
+          span.style.fontFamily = val;
+          span.appendChild(frag);
+          range.insertNode(span);
+        } else {
+          editor.style.fontFamily = val;
+        }
+      } else if (cmd === 'fontSize') {
+        var sizeMap = {'1':'12px','2':'14px','3':'16px','4':'18px','5':'20px','6':'22px','7':'24px'};
+        if (range) {
+          var frag = range.extractContents();
+          var span = document.createElement('span');
+          span.style.fontSize = sizeMap[val] || val;
+          span.appendChild(frag);
+          range.insertNode(span);
+        } else {
+          editor.style.fontSize = sizeMap[val] || val;
+        }
+      }
+      selEl.value = '';
+      updateWordCount();
+    });
+
+    // 字体颜色（简化）
+    document.getElementById('forecolor').addEventListener('change', function() {
+      editor.focus();
+      var range = savedRng;
+      savedRng = null;
+      if (!range) {
+        var s = window.getSelection();
+        if (s.rangeCount && !s.isCollapsed) range = s.getRangeAt(0);
+      }
       if (range) {
         var frag = range.extractContents();
         var span = document.createElement('span');
-        span.style.fontFamily = fontFamily;
+        span.style.color = this.value;
         span.appendChild(frag);
         range.insertNode(span);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        var nr = document.createRange();
-        nr.selectNodeContents(span);
-        sel.addRange(nr);
-      } else {
-        editor.style.fontFamily = fontFamily;
       }
       updateWordCount();
-    }
-
-    function applySize(fontSize) {
-      editor.focus();
-      var range = getEffectiveRange();
-      if (range) {
-        var frag = range.extractContents();
-        var span = document.createElement('span');
-        span.style.fontSize = fontSize;
-        span.appendChild(frag);
-        range.insertNode(span);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        var nr = document.createRange();
-        nr.selectNodeContents(span);
-        sel.addRange(nr);
-      } else {
-        editor.style.fontSize = fontSize;
-      }
-      updateWordCount();
-    }
-
-    function applyColor(color) {
-      editor.focus();
-      var range = getEffectiveRange();
-      if (range) {
-        var frag = range.extractContents();
-        var span = document.createElement('span');
-        span.style.color = color;
-        span.appendChild(frag);
-        range.insertNode(span);
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        var nr = document.createRange();
-        nr.selectNodeContents(span);
-        sel.addRange(nr);
-      }
-      updateWordCount();
-    }
+    });
 
     // ====== 工具栏按钮（粗体/斜体等继续用 execCommand）======
     document.getElementById('toolbar').addEventListener('click', function(e) {
