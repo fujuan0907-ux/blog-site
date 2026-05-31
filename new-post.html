@@ -290,11 +290,41 @@
       }
     });
 
-    // 字体颜色
+    // 字体颜色：取色器抢走焦点前先保存选区
     var foreColorInput = document.getElementById('forecolor');
+    var savedRange = null;
+
+    foreColorInput.addEventListener('mousedown', function() {
+      var sel = window.getSelection();
+      if (sel.rangeCount > 0) {
+        savedRange = sel.getRangeAt(0).cloneRange();
+      }
+    });
+
     foreColorInput.addEventListener('change', function() {
       editor.focus();
-      document.execCommand('foreColor', false, this.value);
+      // 恢复选区
+      if (savedRange) {
+        var sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(savedRange);
+        savedRange = null;
+      }
+
+      var color = this.value;
+      var sel = window.getSelection();
+      if (sel.rangeCount > 0 && !sel.isCollapsed) {
+        // 手动包裹选中内容到 span，比 execCommand 更可靠
+        var range = sel.getRangeAt(0);
+        var span = document.createElement('span');
+        span.style.color = color;
+        try {
+          range.surroundContents(span);
+        } catch(e) {
+          // surroundContents 跨节点时会失败，用 execCommand 兜底
+          document.execCommand('foreColor', false, color);
+        }
+      }
       updateWordCount();
     });
 
