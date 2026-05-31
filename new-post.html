@@ -437,7 +437,27 @@
 
       try {
         var token = getToken();
-        if (!token) { showMsg('alert-error', '登录已过期'); reenable(); return; }
+        if (!token) { showMsg('alert-error', '登录已过期，请重新登录'); reenable(); return; }
+
+        // 尝试刷新 token
+        var session = getSession();
+        if (session && session.refresh_token) {
+          var refreshRes = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
+            method: 'POST',
+            headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: session.refresh_token })
+          });
+          if (refreshRes.ok) {
+            var newTokens = await refreshRes.json();
+            if (newTokens.access_token) {
+              session.access_token = newTokens.access_token;
+              session.refresh_token = newTokens.refresh_token;
+              session.expires_at = Date.now() + (newTokens.expires_in || 3600) * 1000;
+              localStorage.setItem('sb-token', JSON.stringify(session));
+              token = newTokens.access_token;
+            }
+          }
+        }
 
         // 上传图片
         var imageUrls = [];
