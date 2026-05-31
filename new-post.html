@@ -122,35 +122,103 @@
       } catch(e) { showMsg('alert-error', '加载文章失败'); }
     }
 
-    // ====== 图片上传 ======
+    // ====== 图片处理（重写：更健壮的反馈和错误提示）======
     var uploadedImages = [];
-    document.getElementById('image-drop').addEventListener('click', function() { document.getElementById('image-input').click(); });
-    document.getElementById('image-drop').addEventListener('dragover', function(e) { e.preventDefault(); });
-    document.getElementById('image-drop').addEventListener('drop', function(e) {
-      e.preventDefault(); handleFiles(e.dataTransfer.files);
-    });
-    document.getElementById('image-input').addEventListener('change', function(e) { handleFiles(e.target.files); });
+    var imgIdCounter = 0;
 
-    function handleFiles(files) {
+    // 点击上传区域触发文件选择
+    document.getElementById('image-drop').addEventListener('click', function() {
+      document.getElementById('image-input').click();
+    });
+
+    // 拖拽上传
+    var dropZone = document.getElementById('image-drop');
+    dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.style.borderColor = 'var(--primary)'; });
+    dropZone.addEventListener('dragleave', function(e) { dropZone.style.borderColor = ''; });
+    dropZone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropZone.style.borderColor = '';
+      addImages(e.dataTransfer.files);
+    });
+
+    // 文件选择器
+    document.getElementById('image-input').addEventListener('change', function(e) {
+      addImages(e.target.files);
+      e.target.value = ''; // 清空，允许重复选择同一文件
+    });
+
+    function addImages(files) {
+      if (!files || files.length === 0) return;
+
+      var added = 0;
       Array.from(files).forEach(function(file) {
-        if (!file.type.startsWith('image/')) { showMsg('alert-error', file.name + ' 不是图片'); return; }
-        if (file.size > 5*1024*1024) { showMsg('alert-error', file.name + ' 超过 5MB'); return; }
-        uploadedImages.push({ file: file, previewUrl: URL.createObjectURL(file), caption: '' });
+        if (!file.type.startsWith('image/')) {
+          showMsg('alert-error', '❌ "' + file.name + '" 不是图片文件');
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showMsg('alert-error', '❌ "' + file.name + '" 超过 5MB 限制（当前 ' + (file.size / 1024 / 1024).toFixed(1) + 'MB）');
+          return;
+        }
+        var id = ++imgIdCounter;
+        uploadedImages.push({
+          id: id,
+          file: file,
+          previewUrl: URL.createObjectURL(file),
+          uploadedUrl: null,
+          caption: ''
+        });
+        added++;
       });
+
+      if (added > 0) {
+        showMsg('alert-success', '✅ 已选择 ' + added + ' 张图片，点击下方「发布」按钮时会上传');
+      }
       renderImagePreviews();
     }
 
     function renderImagePreviews() {
-      document.getElementById('image-previews').innerHTML = uploadedImages.map(function(img, i) {
-        return '<div class="media-preview-item">' +
-          '<img src="' + img.previewUrl + '" alt="">' +
-          '<button class="media-preview-remove" onclick="removeImg(' + i + ')" type="button">✕</button>' +
-          '</div>' +
-          '<input class="form-input" placeholder="图片说明（可选）" style="width:120px;font-size:0.75rem;padding:0.25rem;" value="' + esc(img.caption) + '" onchange="uploadedImages[' + i + '].caption=this.value">';
-      }).join('');
+      var container = document.getElementById('image-previews');
+      if (uploadedImages.length === 0) {
+        container.innerHTML = '';
+        return;
+      }
+
+      var html = '';
+      uploadedImages.forEach(function(img, i) {
+        var previewSrc = img.previewUrl || img.uploadedUrl || '';
+        html += '<div class="media-preview-item" style="display:inline-block;vertical-align:top;margin:4px;">' +
+          '<img src="' + esc(previewSrc) + '" alt="预览" style="width:120px;height:120px;object-fit:cover;">' +
+          '<button class="media-preview-remove" data-img-index="' + i + '" type="button" title="移除">✕</button>' +
+        '</div>' +
+        '<input class="form-input" placeholder="图片说明（可选）" style="width:120px;font-size:0.75rem;padding:0.25rem;display:inline-block;vertical-align:top;margin:4px;" ' +
+          'value="' + esc(img.caption) + '" data-img-index="' + i + '">';
+      });
+      container.innerHTML = html;
+
+      // 绑定事件（避免 inline handler 索引错乱）
+      container.querySelectorAll('.media-preview-remove').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var idx = parseInt(this.dataset.imgIndex);
+          removeImg(idx);
+        });
+      });
+      container.querySelectorAll('input[data-img-index]').forEach(function(input) {
+        input.addEventListener('input', function() {
+          var idx = parseInt(this.dataset.imgIndex);
+          if (uploadedImages[idx]) uploadedImages[idx].caption = this.value;
+        });
+      });
     }
 
-    function removeImg(i) { URL.revokeObjectURL(uploadedImages[i].previewUrl); uploadedImages.splice(i,1); renderImagePreviews(); }
+    function removeImg(index) {
+      var img = uploadedImages[index];
+      if (img && img.previewUrl && img.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(img.previewUrl);
+      }
+      uploadedImages.splice(index, 1);
+      renderImagePreviews();
+    }
 
     // ====== 视频链接 ======
     var videoEntries = [];
