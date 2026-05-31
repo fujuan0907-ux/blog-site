@@ -225,105 +225,92 @@
       } catch(e) { showMsg('alert-error', '加载文章失败'); }
     }
 
-    // ====== 工具栏 - 全部使用 execCommand ======
+    // ====== 工具栏 ======
+    // 选区保存/恢复（select 和 color input 打开时会丢失选区）
+    var savedRange = null;
+    function saveRange() {
+      var s = window.getSelection();
+      if (s.rangeCount > 0 && !s.isCollapsed) savedRange = s.getRangeAt(0).cloneRange();
+      else savedRange = null;
+    }
+    function restoreRange() {
+      editor.focus();
+      if (savedRange) {
+        var s = window.getSelection(); s.removeAllRanges(); s.addRange(savedRange);
+        savedRange = null;
+      }
+    }
+    // select 和 color input 打开前保存选区
+    document.querySelectorAll('#toolbar select, #toolbar input[type="color"]').forEach(function(el) {
+      el.addEventListener('mousedown', saveRange);
+      el.addEventListener('focus', saveRange);
+    });
+
+    // 按钮命令
     document.getElementById('toolbar').addEventListener('click', function(e) {
       var btn = e.target.closest('button');
       if (!btn) return;
       var cmd = btn.dataset.cmd;
       if (!cmd) return;
       e.preventDefault();
-
       editor.focus();
 
       if (cmd === 'createLink') {
         var url = prompt('输入链接地址（https://...）：', 'https://');
         if (url) document.execCommand(cmd, false, url);
-        return;
+        updateWordCount(); return;
       }
-
-      if (cmd === 'undo' || cmd === 'redo') {
-        document.execCommand(cmd);
-        return;
-      }
-
-      // 标题 / 引用 / 代码块：先确保选区落在段落内
-      if (cmd === 'formatBlock') return; // handled by select change
-      if (cmd === 'fontName') return;     // handled by select change
-      if (cmd === 'fontSize') return;     // handled by select change
-
+      if (cmd === 'formatBlock' || cmd === 'fontName' || cmd === 'fontSize') return;
       document.execCommand(cmd, false, null);
       updateWordCount();
     });
 
-    // Select 类型的命令
+    // 段落/字体/字号 select
     document.getElementById('toolbar').addEventListener('change', function(e) {
       var sel = e.target;
       if (sel.tagName !== 'SELECT') return;
       var cmd = sel.dataset.cmd;
       var val = sel.value;
+      if (!val) return;
 
-      editor.focus();
+      restoreRange();
+      var selection = window.getSelection();
+      if (!selection.rangeCount || selection.isCollapsed) {
+        showMsg('alert-error', '请先选中要格式化的文字');
+        sel.value = ''; return;
+      }
+      var range = selection.getRangeAt(0);
 
       if (cmd === 'formatBlock') {
-        if (val === 'blockquote' || val === 'pre') {
-          document.execCommand('formatBlock', false, val);
-        } else {
-          document.execCommand('formatBlock', false, val);
-        }
-        sel.value = '';
-        updateWordCount();
-        return;
+        document.execCommand('formatBlock', false, val);
+      } else if (cmd === 'fontName') {
+        try {
+          var span = document.createElement('span');
+          span.style.fontFamily = val;
+          range.surroundContents(span);
+        } catch(e) { document.execCommand('fontName', false, val); }
+      } else if (cmd === 'fontSize') {
+        var sizeMap = {'1':'12px','2':'14px','3':'16px','4':'18px','5':'20px','6':'22px','7':'24px'};
+        try {
+          var s = document.createElement('span');
+          s.style.fontSize = sizeMap[val] || val;
+          range.surroundContents(s);
+        } catch(e) { document.execCommand('fontSize', false, val); }
       }
-
-      if (cmd === 'fontName' && val) {
-        document.execCommand('fontName', false, val);
-        sel.value = '';
-        updateWordCount();
-        return;
-      }
-
-      if (cmd === 'fontSize' && val) {
-        document.execCommand('fontSize', false, val);
-        sel.value = '';
-        updateWordCount();
-        return;
-      }
+      sel.value = '';
+      updateWordCount();
     });
 
-    // 字体颜色：取色器抢走焦点前先保存选区
+    // 字体颜色
     var foreColorInput = document.getElementById('forecolor');
-    var savedRange = null;
-
-    foreColorInput.addEventListener('mousedown', function() {
-      var sel = window.getSelection();
-      if (sel.rangeCount > 0) {
-        savedRange = sel.getRangeAt(0).cloneRange();
-      }
-    });
-
     foreColorInput.addEventListener('change', function() {
-      editor.focus();
-      // 恢复选区
-      if (savedRange) {
-        var sel = window.getSelection();
-        sel.removeAllRanges();
-        sel.addRange(savedRange);
-        savedRange = null;
-      }
-
-      var color = this.value;
+      restoreRange();
       var sel = window.getSelection();
       if (sel.rangeCount > 0 && !sel.isCollapsed) {
-        // 手动包裹选中内容到 span，比 execCommand 更可靠
         var range = sel.getRangeAt(0);
         var span = document.createElement('span');
-        span.style.color = color;
-        try {
-          range.surroundContents(span);
-        } catch(e) {
-          // surroundContents 跨节点时会失败，用 execCommand 兜底
-          document.execCommand('foreColor', false, color);
-        }
+        span.style.color = this.value;
+        try { range.surroundContents(span); } catch(e) { document.execCommand('foreColor', false, this.value); }
       }
       updateWordCount();
     });
