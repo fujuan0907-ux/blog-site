@@ -2,6 +2,9 @@
    Blog Site - 全局样式
    ============================================ */
 
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&family=Noto+Serif+SC:wght@400;700&family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Fira+Code:wght@400&display=swap');
+
 /* --- CSS Variables --- */
 :root {
   --primary: #3b82f6;
