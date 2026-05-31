@@ -82,12 +82,26 @@
       }
 
       try {
-        var select = 'id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)';
+        var select = 'id,title,content,media_urls,user_id,created_at,updated_at';
         var res = await fetch(SUPABASE_URL + '/rest/v1/posts?id=eq.' + id + '&select=' + select, {
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
         var posts = await res.json();
         var post = posts && posts[0];
+
+        // 单独查询用户名
+        var authorName = '匿名';
+        if (post && post.user_id) {
+          try {
+            var profileRes = await fetch(SUPABASE_URL + '/rest/v1/profiles?select=username&id=eq.' + post.user_id, {
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+            });
+            if (profileRes.ok) {
+              var profileData = await profileRes.json();
+              if (profileData && profileData[0]) authorName = profileData[0].username || '匿名';
+            }
+          } catch(e) {}
+        }
 
         if (!post) {
           document.getElementById('post-container').innerHTML = '<div class="empty-state"><div class="icon">🔍</div><h3>文章不存在</h3><a href="index.html" class="btn btn-outline mt-2">返回首页</a></div>';
@@ -106,7 +120,7 @@
             '<header class="post-detail-header">' +
               '<h1 class="post-detail-title">' + esc(post.title) + '</h1>' +
               '<div class="post-detail-meta">' +
-                '<span>👤 ' + esc((post.profiles || {}).username || '匿名') + '</span>' +
+                '<span>👤 ' + esc(authorName) + '</span>' +
                 '<span>🕐 ' + fmtDate(post.created_at) + '</span>' + updated +
               '</div>' +
               (isOwner ? '<div class="post-detail-actions"><a href="new-post.html?edit=' + post.id + '" class="btn btn-outline btn-sm">✏️ 编辑</a><button class="btn btn-danger btn-sm" id="btn-delete">🗑️ 删除</button></div>' : '') +

@@ -62,14 +62,33 @@
     // ====== 加载文章 ======
     var currentTab = 'all';
     var allPosts = [];
+    var userProfiles = {}; // user_id -> username 映射
 
     async function loadPosts() {
       try {
-        var params = 'select=id,title,content,media_urls,user_id,created_at,updated_at,profiles!posts_user_id_fkey(username)&order=created_at.desc';
+        // 查询文章（不 join profiles，避免 FK 关系问题）
+        var params = 'select=id,title,content,media_urls,user_id,created_at,updated_at&order=created_at.desc';
         var res = await fetch(SUPABASE_URL + '/rest/v1/posts?' + params, {
           headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
         });
+        if (!res.ok) { console.log('查询失败'); return; }
         allPosts = await res.json();
+
+        // 收集所有 user_id，批量查询 username
+        if (allPosts.length > 0) {
+          var userIds = allPosts.map(function(p) { return p.user_id; }).filter(Boolean);
+          var uniqueIds = userIds.filter(function(id, i) { return userIds.indexOf(id) === i; });
+          if (uniqueIds.length > 0) {
+            var idList = uniqueIds.join(',');
+            var profileRes = await fetch(SUPABASE_URL + '/rest/v1/profiles?select=id,username&id=in.(' + idList + ')', {
+              headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY }
+            });
+            if (profileRes.ok) {
+              var profiles = await profileRes.json();
+              profiles.forEach(function(p) { userProfiles[p.id] = p.username; });
+            }
+          }
+        }
         renderPosts();
       } catch(e) { console.log('加载失败:', e.message); }
     }
@@ -95,16 +114,36 @@
 
       container.innerHTML = posts.map(function(post) {
         var thumb = (post.media_urls || []).find(function(m) { return m.type === 'image'; });
-        return '<article class="post-card" onclick="location.href=\'post.html?id=' + post.id + '\'">' +
-          (thumb ? '<img class="post-card-thumb" src="' + esc(thumb.url) + '" alt="" loading="lazy">' : '') +
-          '<h2 class="post-card-title"><a href="post.html?id=' + post.id + '">' + esc(post.title) + '</a></h2>' +
-          '<div class="post-card-meta">' +
-            '<span>👤 ' + esc((post.profiles || {}).username || '匿名') + '</span>' +
-            '<span>🕐 ' + fmtDate(post.created_at) + '</span>' +
-            ((post.media_urls || []).length ? '<span>📎 ' + post.media_urls.length + ' 个附件</span>' : '') +
-          '</div>' +
-          '<p class="post-card-excerpt">' + esc(excerpt(post.content)) + '</p>' +
-        '</article>';
+        var username = userProfiles[post.user_id] || '匿名';
+
+        if (thumb) {
+          // 有缩略图的布局：左图右文
+          return '<article class="post-card" onclick="location.href=\'post.html?id=' + post.id + '\'" style="display:flex;gap:1rem;align-items:flex-start;">' +
+            '<div style="flex-shrink:0;width:180px;height:120px;border-radius:8px;overflow:hidden;background:var(--gray-100);">' +
+              '<img src="' + esc(thumb.url) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;">' +
+            '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<h2 class="post-card-title" style="margin-bottom:0.35rem;"><a href="post.html?id=' + post.id + '">' + esc(post.title) + '</a></h2>' +
+              '<div class="post-card-meta">' +
+                '<span>👤 ' + esc(username) + '</span>' +
+                '<span>🕐 ' + fmtDate(post.created_at) + '</span>' +
+                ((post.media_urls || []).length ? '<span>📎 ' + post.media_urls.length + ' 个附件</span>' : '') +
+              '</div>' +
+              '<p class="post-card-excerpt">' + esc(excerpt(post.content)) + '</p>' +
+            '</div>' +
+          '</article>';
+        } else {
+          // 无图的纯文字布局
+          return '<article class="post-card" onclick="location.href=\'post.html?id=' + post.id + '\'">' +
+            '<h2 class="post-card-title"><a href="post.html?id=' + post.id + '">' + esc(post.title) + '</a></h2>' +
+            '<div class="post-card-meta">' +
+              '<span>👤 ' + esc(username) + '</span>' +
+              '<span>🕐 ' + fmtDate(post.created_at) + '</span>' +
+              ((post.media_urls || []).length ? '<span>📎 ' + post.media_urls.length + ' 个附件</span>' : '') +
+            '</div>' +
+            '<p class="post-card-excerpt">' + esc(excerpt(post.content)) + '</p>' +
+          '</article>';
+        }
       }).join('');
     }
 
