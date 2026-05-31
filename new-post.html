@@ -6,6 +6,11 @@
   <title>写文章 - My Blog</title>
   <link rel="stylesheet" href="css/style.css">
   <style>
+    /* 字体直接在这个页面加载（不依赖 style.css 的 @import） */
+    @import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-sc@5.0.18/index.css');
+    @import url('https://cdn.jsdelivr.net/npm/@fontsource/noto-serif-sc@5.0.17/index.css');
+    @import url('https://fonts.googleapis.cn/css2?family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Fira+Code:wght@400&display=swap');
+
     .editor-toolbar {
       display: flex; flex-wrap: wrap; gap: 2px;
       padding: 6px 8px; background: var(--gray-50);
@@ -276,7 +281,9 @@
           editor.style.fontSize = sizeMap[val] || val;
         }
       }
-      selEl.value = '';
+      // 延迟重置，让用户看到选了哪个字体
+      var that = selEl;
+      setTimeout(function() { that.value = ''; }, 2000);
       updateWordCount();
     });
 
@@ -315,33 +322,6 @@
       if (cmd === 'formatBlock' || cmd === 'fontName' || cmd === 'fontSize') return;
       document.execCommand(cmd, false, null);
       updateWordCount();
-    });
-
-    // ====== 段落/字体/字号 select ======
-    var sizeMap = {'1':'12px','2':'14px','3':'16px','4':'18px','5':'20px','6':'22px','7':'24px'};
-
-    document.getElementById('toolbar').addEventListener('change', function(e) {
-      var selEl = e.target;
-      if (selEl.tagName !== 'SELECT') return;
-      var cmd = selEl.dataset.cmd;
-      var val = selEl.value;
-      if (!val) return;
-
-      if (cmd === 'formatBlock') {
-        editor.focus();
-        document.execCommand('formatBlock', false, val);
-      } else if (cmd === 'fontName') {
-        applyFont(val);
-      } else if (cmd === 'fontSize') {
-        applySize(sizeMap[val] || val);
-      }
-      selEl.value = '';
-      updateWordCount();
-    });
-
-    // ====== 字体颜色 ======
-    document.getElementById('forecolor').addEventListener('change', function() {
-      applyColor(this.value);
     });
 
     // 字数统计
