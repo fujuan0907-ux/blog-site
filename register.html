@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>注册 - My Blog</title>
   <link rel="stylesheet" href="css/style.css">
-  <script src="js/config.js"></script>
 </head>
 <body class="auth-page">
 
@@ -14,8 +13,8 @@
     <h2 class="auth-title">创建账号</h2>
     <p class="auth-subtitle">注册后即可发布文章</p>
 
-    <div id="alert-error" class="alert alert-error"></div>
-    <div id="alert-success" class="alert alert-success"></div>
+    <div id="alert-error" class="alert alert-error" style="display:none;"></div>
+    <div id="alert-success" class="alert alert-success" style="display:none;"></div>
 
     <form id="register-form">
       <div class="form-group">
@@ -53,52 +52,64 @@
     </p>
   </div>
 
-  <script src="js/app.js"></script>
   <script>
-    const form = document.getElementById('register-form');
+    // ====== 直接内联，不依赖任何外部文件 ======
+    const SUPABASE_URL = 'https://kieznunxgzsaxxokvspx.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtpZXpudW54Z3pzYXh4b2t2c3B4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjI2NDIsImV4cCI6MjA5NTc5ODY0Mn0.9peQ-Xc6FgNYTrz9IxM9322uWfG_6tCsxd-AyP4JSkU';
 
-    form.addEventListener('submit', async (e) => {
+    function showMsg(id, msg) {
+      var el = document.getElementById(id);
+      el.textContent = msg;
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 6000);
+    }
+
+    document.getElementById('register-form').addEventListener('submit', async function(e) {
       e.preventDefault();
-      const username = document.getElementById('username').value.trim();
-      const email = document.getElementById('email').value.trim();
-      const password = document.getElementById('password').value;
-      const confirmPassword = document.getElementById('confirm-password').value;
 
-      if (password !== confirmPassword) {
-        showAlert('alert-error', '两次输入的密码不一致');
-        return;
-      }
+      var username = document.getElementById('username').value.trim();
+      var email = document.getElementById('email').value.trim();
+      var password = document.getElementById('password').value;
+      var confirm = document.getElementById('confirm-password').value;
 
-      if (password.length < 6) {
-        showAlert('alert-error', '密码至少需要 6 位字符');
-        return;
-      }
+      if (password !== confirm) { showMsg('alert-error', '两次密码不一致'); return; }
+      if (password.length < 6) { showMsg('alert-error', '密码至少 6 位字符'); return; }
 
+      // 显示加载
       document.getElementById('btn-text').classList.add('hidden');
       document.getElementById('btn-spinner').classList.remove('hidden');
       document.getElementById('btn-submit').disabled = true;
 
-      const { data, error } = await signUp(email, password, username);
+      try {
+        var res = await fetch(SUPABASE_URL + '/auth/v1/signup', {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: email, password: password, data: { username: username } })
+        });
 
-      // 无论如何先恢复按钮状态
-      document.getElementById('btn-text').classList.remove('hidden');
-      document.getElementById('btn-spinner').classList.add('hidden');
-      document.getElementById('btn-submit').disabled = false;
+        var data = await res.json();
 
-      if (error) {
-        showAlert('alert-error', error.message || '注册失败，请重试');
-      } else if (data && data.id) {
-        showAlert('alert-success', '✅ 注册成功！正在跳转到登录页...');
-        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
-      } else if (data?.user) {
-        // supabase-js 格式兼容
-        showAlert('alert-success', '✅ 注册成功！请查看邮箱确认链接，然后登录。');
-        setTimeout(() => { window.location.href = 'login.html'; }, 2000);
-      } else {
-        showAlert('alert-success', '✅ 注册请求已提交！如果开启邮箱验证，请查看邮箱。');
-        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+        // 恢复按钮
+        document.getElementById('btn-text').classList.remove('hidden');
+        document.getElementById('btn-spinner').classList.add('hidden');
+        document.getElementById('btn-submit').disabled = false;
+
+        if (res.ok && (data.user || data.id)) {
+          showMsg('alert-success', '✅ 注册成功！正在跳转到登录页...');
+          setTimeout(function() { window.location.href = 'login.html'; }, 1500);
+        } else {
+          var errMsg = data.msg || data.message || data.error || '注册失败';
+          showMsg('alert-error', '❌ ' + errMsg);
+        }
+      } catch(err) {
+        document.getElementById('btn-text').classList.remove('hidden');
+        document.getElementById('btn-spinner').classList.add('hidden');
+        document.getElementById('btn-submit').disabled = false;
+        showMsg('alert-error', '❌ 网络错误: ' + err.message);
       }
-
     });
   </script>
 </body>
