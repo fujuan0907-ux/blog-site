@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>发布文章 - My Blog</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <a href="index.html" class="navbar-brand">📝 My Blog</a>
+    <ul class="navbar-nav" id="nav-auth"></ul>
+  </nav>
+
+  <main class="container">
+    <div class="card">
+      <div class="card-header">
+        <h1 class="card-title" id="page-title">✏️ 发布新文章</h1>
+      </div>
+
+      <div id="alert-error" class="alert alert-error"></div>
+      <div id="alert-success" class="alert alert-success"></div>
+
+      <form id="post-form">
+        <div class="form-group">
+          <label class="form-label" for="post-title">文章标题</label>
+          <input class="form-input" type="text" id="post-title" placeholder="输入文章标题..." required maxlength="255">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="post-content">文章内容</label>
+          <textarea class="form-textarea" id="post-content" placeholder="在这里写下你的想法...&#10;&#10;支持 Markdown 风格排版" required></textarea>
+        </div>
+
+        <!-- 图片上传区 -->
+        <div class="form-group">
+          <label class="form-label">📷 上传图片</label>
+          <div class="media-upload-area" id="image-upload-area">
+            <div class="icon">🖼️</div>
+            <p>点击上传图片（支持 JPG/PNG/GIF/WebP）</p>
+            <p class="form-hint">每张图片最大 5MB</p>
+          </div>
+          <input type="file" id="image-input" accept="image/*" multiple style="display:none;">
+          <div class="media-preview" id="image-previews"></div>
+        </div>
+
+        <!-- 视频链接区 -->
+        <div class="form-group">
+          <label class="form-label">🎬 添加视频</label>
+          <p class="form-hint">支持 YouTube / Bilibili 链接，或直接输入视频 URL</p>
+          <div id="video-urls">
+            <!-- 动态添加 -->
+          </div>
+          <button type="button" class="btn btn-outline btn-sm mt-1" id="btn-add-video">+ 添加视频链接</button>
+        </div>
+
+        <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="submit" class="btn btn-primary" id="btn-submit">
+            <span id="btn-text">发布文章</span>
+            <span class="spinner hidden" id="btn-spinner"></span>
+          </button>
+          <a href="index.html" class="btn btn-outline">取消</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="js/app.js"></script>
+  <script>
+    // ============ 权限检查 ============
+    (async () => {
+      const { user } = await getCurrentUser();
+      if (!user) {
+        window.location.href = 'login.html';
+        return;
+      }
+      updateNavbar();
+
+      // 检查是否是编辑模式
+      const urlParams = new URLSearchParams(window.location.search);
+      const editId = urlParams.get('edit');
+      if (editId) await loadPostForEditing(editId);
+    })();
+
+    // ============ 图片上传 ============
+    const imageUploadArea = document.getElementById('image-upload-area');
+    const imageInput = document.getElementById('image-input');
+    const imagePreviews = document.getElementById('image-previews');
+    const uploadedImages = []; // { file, previewUrl, caption }
+
+    imageUploadArea.addEventListener('click', () => imageInput.click());
+    imageUploadArea.addEventListener('dragover', (e) => { e.preventDefault(); imageUploadArea.style.borderColor = 'var(--primary)'; });
+    imageUploadArea.addEventListener('dragleave', () => { imageUploadArea.style.borderColor = 'var(--gray-300)'; });
+    imageUploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      imageUploadArea.style.borderColor = 'var(--gray-300)';
+      handleImageFiles(e.dataTransfer.files);
+    });
+    imageInput.addEventListener('change', (e) => handleImageFiles(e.target.files));
+
+    function handleImageFiles(files) {
+      Array.from(files).forEach(file => {
+        if (!file.type.startsWith('image/')) {
+          showAlert('alert-error', `${file.name} 不是图片文件`);
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showAlert('alert-error', `${file.name} 超过 5MB 限制`);
+          return;
+        }
+        const previewUrl = URL.createObjectURL(file);
+        uploadedImages.push({ file, previewUrl, caption: '' });
+        renderImagePreviews();
+      });
+    }
+
+    function removeImage(index) {
+      URL.revokeObjectURL(uploadedImages[index].previewUrl);
+      uploadedImages.splice(index, 1);
+      renderImagePreviews();
+    }
+
+    function renderImagePreviews() {
+      imagePreviews.innerHTML = uploadedImages.map((img, i) => `
+        <div class="media-preview-item">
+          <img src="${img.previewUrl}" alt="预览">
+          <button class="media-preview-remove" onclick="removeImage(${i})" type="button">✕</button>
+        </div>
+        <input type="text" class="form-input" placeholder="图片说明（可选）"
+          style="width:120px;font-size:0.75rem;padding:0.25rem 0.5rem;"
+          value="${escapeHtml(img.caption)}"
+          onchange="uploadedImages[${i}].caption = this.value">
+      `).join('');
+    }
+
+    // ============ 视频链接 ============
+    const videoUrlsContainer = document.getElementById('video-urls');
+    const videoEntries = []; // { url, caption }
+
+    document.getElementById('btn-add-video').addEventListener('click', () => {
+      videoEntries.push({ url: '', caption: '' });
+      renderVideoInputs();
+    });
+
+    function removeVideo(index) {
+      videoEntries.splice(index, 1);
+      renderVideoInputs();
+    }
+
+    function renderVideoInputs() {
+      videoUrlsContainer.innerHTML = videoEntries.map((v, i) => `
+        <div class="video-url-row" style="margin-bottom:0.5rem;">
+          <input type="url" class="form-input" placeholder="视频 URL（YouTube/Bilibili/直链）"
+            value="${escapeHtml(v.url)}"
+            onchange="videoEntries[${i}].url = this.value">
+          <input type="text" class="form-input" placeholder="视频说明（可选）" style="max-width:160px;"
+            value="${escapeHtml(v.caption)}"
+            onchange="videoEntries[${i}].caption = this.value">
+          <button type="button" class="btn btn-outline btn-sm" onclick="removeVideo(${i})">✕</button>
+        </div>
+      `).join('');
+    }
+
+    // ============ 表单提交 ============
+    const form = document.getElementById('post-form');
+    let editingPostId = null;
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const title = document.getElementById('post-title').value.trim();
+      const content = document.getElementById('post-content').value.trim();
+
+      if (!title) { showAlert('alert-error', '请输入文章标题'); return; }
+      if (!content) { showAlert('alert-error', '请输入文章内容'); return; }
+
+      document.getElementById('btn-text').classList.add('hidden');
+      document.getElementById('btn-spinner').classList.remove('hidden');
+      document.getElementById('btn-submit').disabled = true;
+
+      try {
+        const { user } = await getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+
+        // 上传图片
+        const imageMediaUrls = [];
+        for (const img of uploadedImages) {
+          if (img.uploadedUrl) {
+            // 编辑模式：已有 URL，不需重新上传
+            imageMediaUrls.push({ type: 'image', url: img.uploadedUrl, caption: img.caption });
+          } else {
+            const { url, error } = await uploadMedia(img.file, user.id);
+            if (error) {
+              showAlert('alert-error', `图片上传失败: ${error.message}`);
+              return;
+            }
+            imageMediaUrls.push({ type: 'image', url, caption: img.caption });
+          }
+        }
+
+        // 收集视频链接
+        const videoMediaUrls = videoEntries
+          .filter(v => v.url.trim())
+          .map(v => ({ type: 'video', url: v.url.trim(), caption: v.caption }));
+
+        const allMediaUrls = [...imageMediaUrls, ...videoMediaUrls];
+
+        let result;
+        if (editingPostId) {
+          result = await updatePost(editingPostId, title, content, allMediaUrls);
+        } else {
+          result = await createPost(title, content, allMediaUrls);
+        }
+
+        if (result.error) {
+          showAlert('alert-error', result.error.message || '操作失败');
+        } else {
+          window.location.href = `post.html?id=${result.data.id}`;
+        }
+      } catch (err) {
+        showAlert('alert-error', err.message || '发生错误，请重试');
+      }
+
+      document.getElementById('btn-text').classList.remove('hidden');
+      document.getElementById('btn-spinner').classList.add('hidden');
+      document.getElementById('btn-submit').disabled = false;
+    });
+
+    // ============ 编辑模式 ============
+    async function loadPostForEditing(id) {
+      const { data: post, error } = await getPostById(id);
+      if (error || !post) {
+        showAlert('alert-error', '文章不存在');
+        return;
+      }
+
+      // 检查权限
+      const { user } = await getCurrentUser();
+      if (!user || user.id !== post.user_id) {
+        window.location.href = `post.html?id=${id}`;
+        return;
+      }
+
+      editingPostId = id;
+      document.getElementById('page-title').textContent = '✏️ 编辑文章';
+      document.getElementById('btn-text').textContent = '保存修改';
+      document.getElementById('post-title').value = post.title;
+      document.getElementById('post-content').value = post.content;
+
+      // 恢复已上传的媒体
+      if (post.media_urls) {
+        post.media_urls.forEach(media => {
+          if (media.type === 'image') {
+            uploadedImages.push({
+              file: null,
+              previewUrl: media.url,
+              uploadedUrl: media.url,
+              caption: media.caption || '',
+            });
+          } else if (media.type === 'video') {
+            videoEntries.push({ url: media.url, caption: media.caption || '' });
+          }
+        });
+        renderImagePreviews();
+        renderVideoInputs();
+      }
+    }
+  </script>
+</body>
+</html>

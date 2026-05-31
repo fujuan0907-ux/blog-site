@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - My Blog</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+</head>
+<body class="auth-page">
+
+  <div class="auth-card">
+    <div class="auth-logo">📝 My Blog</div>
+    <h2 class="auth-title">欢迎回来</h2>
+    <p class="auth-subtitle">登录你的账号继续写作</p>
+
+    <div id="alert-error" class="alert alert-error"></div>
+    <div id="alert-success" class="alert alert-success"></div>
+
+    <form id="login-form">
+      <div class="form-group">
+        <label class="form-label" for="email">邮箱地址</label>
+        <input class="form-input" type="email" id="email" placeholder="your@email.com" required autocomplete="email">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">密码</label>
+        <input class="form-input" type="password" id="password" placeholder="输入密码" required autocomplete="current-password">
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block" id="btn-submit">
+        <span id="btn-text">登录</span>
+        <span class="spinner hidden" id="btn-spinner"></span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <a href="reset-password.html">忘记密码？</a>
+      <span style="margin: 0 0.5rem;">|</span>
+      <span>还没有账号？<a href="register.html">立即注册</a></span>
+    </div>
+
+    <p class="text-center mt-2">
+      <a href="index.html" style="color: var(--gray-400); font-size: 0.85rem;">← 返回首页</a>
+    </p>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    const form = document.getElementById('login-form');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+
+      // 显示加载状态
+      document.getElementById('btn-text').classList.add('hidden');
+      document.getElementById('btn-spinner').classList.remove('hidden');
+      document.getElementById('btn-submit').disabled = true;
+
+      const { data, error } = await signIn(email, password);
+
+      if (error) {
+        showAlert('alert-error', error.message || '登录失败，请检查邮箱和密码');
+      } else {
+        showAlert('alert-success', '登录成功！正在跳转...');
+        setTimeout(() => { window.location.href = 'index.html'; }, 800);
+      }
+
+      document.getElementById('btn-text').classList.remove('hidden');
+      document.getElementById('btn-spinner').classList.add('hidden');
+      document.getElementById('btn-submit').disabled = false;
+    });
+
+    // 如果已经登录，直接跳转
+    (async () => {
+      const { user } = await getCurrentUser();
+      if (user) window.location.href = 'index.html';
+    })();
+  </script>
+</body>
+</html>
